@@ -1,0 +1,9 @@
+*~
+*.swp
+*.prename
+
+repotool
+repotool.conf
+log
+pid
+tags
