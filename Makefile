@@ -13,6 +13,9 @@ test:
 	go test ${PKG}/...
 
 deps:
+	go get -d github.com/libgit2/git2go && \
+		cd "${GOPATH}/src/github.com/libgit2/git2go" && \
+		git submodule update --init && make install
 	go get -u github.com/lib/pq
 	go get -u github.com/spaolacci/murmur3
 
