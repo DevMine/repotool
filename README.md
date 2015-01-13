@@ -1,5 +1,10 @@
 # repotool - a tool to aggregate source code repositories metadata
 
+[![Build Status](https://travis-ci.org/DevMine/repotool.png?branch=master)](https://travis-ci.org/DevMine/repotool)
+[![GoDoc](http://godoc.org/github.com/DevMine/repotool?status.svg)](http://godoc.org/github.com/DevMine/repotool)
+[![GoWalker](http://img.shields.io/badge/doc-gowalker-blue.svg?style=flat)](https://gowalker.org/github.com/DevMine/repotool)
+[![Gobuild Download](http://gobuild.io/badge/github.com/DevMine/repotool/downloads.svg)](http://gobuild.io/github.com/DevMine/repotool)
+
 `repotool` is a command line tool that aggregates source code repositories
 metadata (such as VCS type, commits and so on) and produces JSON objects out of
 it.  It is also able to store repository information into a database.
