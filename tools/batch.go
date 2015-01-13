@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -28,7 +29,7 @@ func main() {
 		os.Exit(0)
 	}
 	depthflag := flag.Uint("d", 0, "depth level where to find repositories")
-	maxGoroutines := flag.Uint("g", 4, "max number of goroutines to spawn")
+	maxGoroutines := flag.Uint("g", uint(runtime.NumCPU()), "max number of goroutines to spawn")
 	flag.Parse()
 
 	if len(flag.Args()) != 2 {
