@@ -99,6 +99,7 @@ func extractGitURL(path string) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	bs, err := ioutil.ReadAll(f)
 	if err != nil {
@@ -125,6 +126,7 @@ func extractGitDefaultBranch(path string) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	bs, err := ioutil.ReadAll(f)
 	if err != nil {
