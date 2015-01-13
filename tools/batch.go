@@ -59,11 +59,13 @@ func iterateRepos(rtBin, configPath, path string, depth uint) {
 			fmt.Println("current repository: ", fi.Name())
 			repoPath := filepath.Join(path, fi.Name())
 
-			out, err := exec.Command(rtBin, "-json=false", "-c", configPath, "-db", repoPath).CombinedOutput()
-			fmt.Print(string(out))
-			if err != nil {
-				fmt.Println(err)
-			}
+			go func() {
+				out, err := exec.Command(rtBin, "-json=false", "-c", configPath, "-db", repoPath).CombinedOutput()
+				fmt.Print(string(out))
+				if err != nil {
+					fmt.Println(err)
+				}
+			}()
 		}
 		return
 	}
