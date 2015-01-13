@@ -22,7 +22,7 @@ import (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Printf("usage: %s [-d depth] [CONFIGURATION FILE] [REPOSITORIES ROOT FOLDER]\n",
+		fmt.Printf("usage: %s [(OPTIONS)] [CONFIGURATION FILE] [REPOSITORIES ROOT FOLDER]\n",
 			filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 		os.Exit(0)
