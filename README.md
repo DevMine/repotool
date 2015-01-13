@@ -93,3 +93,12 @@ adjust database connection information. See this
 more information about the database schema. Example usage:
 
     repotool -json=false -db -c repotool.conf ~/Code/myawesomeproject
+
+If you plan on batch processing multiple repositories, look at `batch.go` in the
+`tools` folder. It can process repositories concurrently by recursively
+traversing directories and calling `repotool`, spawning goroutines in the
+process.  When using it, bear in mind that `repotool` is IO and CPU intensive,
+hence do not spawn too many goroutines or you might reach the number of open
+files limit. The number of goroutines can be adjusted with the `-g` parameter.
+Using about the same number of goroutines as the number of cpu cores should be a
+reasonnable choice.
