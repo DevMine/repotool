@@ -17,7 +17,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 )
+
+var maxGoroutines = flag.Uint("g", 4, "max number of goroutines to spawn")
+var goroutinesCounter uint
 
 func main() {
 	flag.Usage = func() {
@@ -42,10 +46,11 @@ func main() {
 		fatal(err)
 	}
 
-	iterateRepos(rtBin, configPath, reposDir, *depthflag)
+	wg := new(sync.WaitGroup)
+	iterateRepos(wg, rtBin, configPath, reposDir, *depthflag)
 }
 
-func iterateRepos(rtBin, configPath, path string, depth uint) {
+func iterateRepos(wg *sync.WaitGroup, rtBin, configPath, path string, depth uint) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
 		fatal(err)
@@ -56,10 +61,19 @@ func iterateRepos(rtBin, configPath, path string, depth uint) {
 			if !fi.IsDir() {
 				continue
 			}
+
+			if goroutinesCounter == *maxGoroutines {
+				wg.Wait()
+				goroutinesCounter = 0
+			}
+
 			fmt.Println("current repository: ", fi.Name())
 			repoPath := filepath.Join(path, fi.Name())
 
+			wg.Add(1)
+			goroutinesCounter++
 			go func() {
+				defer wg.Done()
 				out, err := exec.Command(rtBin, "-json=false", "-c", configPath, "-db", repoPath).CombinedOutput()
 				fmt.Print(string(out))
 				if err != nil {
@@ -75,7 +89,7 @@ func iterateRepos(rtBin, configPath, path string, depth uint) {
 			continue
 		}
 
-		iterateRepos(rtBin, configPath, filepath.Join(path, fi.Name()), depth-1)
+		iterateRepos(wg, rtBin, configPath, filepath.Join(path, fi.Name()), depth-1)
 	}
 }
 
