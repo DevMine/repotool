@@ -20,9 +20,6 @@ import (
 	"sync"
 )
 
-var maxGoroutines = flag.Uint("g", 4, "max number of goroutines to spawn")
-var goroutinesCounter uint
-
 func main() {
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [-d depth] [CONFIGURATION FILE] [REPOSITORIES ROOT FOLDER]\n",
@@ -31,6 +28,7 @@ func main() {
 		os.Exit(0)
 	}
 	depthflag := flag.Uint("d", 0, "depth level where to find repositories")
+	maxGoroutines := flag.Uint("g", 4, "max number of goroutines to spawn")
 	flag.Parse()
 
 	if len(flag.Args()) != 2 {
@@ -46,11 +44,29 @@ func main() {
 		fatal(err)
 	}
 
-	wg := new(sync.WaitGroup)
-	iterateRepos(wg, rtBin, configPath, reposDir, *depthflag)
+	tasks := make(chan *exec.Cmd, 0)
+	var wg sync.WaitGroup
+	for w := uint(0); w < *maxGoroutines; w++ {
+		wg.Add(1)
+		go func() {
+			for cmd := range tasks {
+				out, err := cmd.CombinedOutput()
+				fmt.Print(string(out))
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	iterateRepos(tasks, rtBin, configPath, reposDir, *depthflag)
+
+	close(tasks)
+	wg.Wait()
 }
 
-func iterateRepos(wg *sync.WaitGroup, rtBin, configPath, path string, depth uint) {
+func iterateRepos(tasks chan *exec.Cmd, rtBin, configPath, path string, depth uint) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
 		fatal(err)
@@ -62,24 +78,10 @@ func iterateRepos(wg *sync.WaitGroup, rtBin, configPath, path string, depth uint
 				continue
 			}
 
-			if goroutinesCounter == *maxGoroutines {
-				wg.Wait()
-				goroutinesCounter = 0
-			}
-
-			fmt.Println("current repository: ", fi.Name())
+			fmt.Println("adding repository: ", fi.Name(), " to the tasks pool")
 			repoPath := filepath.Join(path, fi.Name())
 
-			wg.Add(1)
-			goroutinesCounter++
-			go func() {
-				defer wg.Done()
-				out, err := exec.Command(rtBin, "-json=false", "-c", configPath, "-db", repoPath).CombinedOutput()
-				fmt.Print(string(out))
-				if err != nil {
-					fmt.Println(err)
-				}
-			}()
+			tasks <- exec.Command(rtBin, "-json=false", "-c", configPath, "-db", repoPath)
 		}
 		return
 	}
@@ -89,7 +91,7 @@ func iterateRepos(wg *sync.WaitGroup, rtBin, configPath, path string, depth uint
 			continue
 		}
 
-		iterateRepos(wg, rtBin, configPath, filepath.Join(path, fi.Name()), depth-1)
+		iterateRepos(tasks, rtBin, configPath, filepath.Join(path, fi.Name()), depth-1)
 	}
 }
 
