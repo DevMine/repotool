@@ -79,6 +79,11 @@ func (c Config) verify() error {
 		return err
 	}
 
+	err = c.Data.verify()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -101,6 +106,14 @@ func (dc DatabaseConfig) verify() error {
 
 	if _, ok := sslModes[dc.SSLMode]; !ok {
 		return errors.New("database can only be disable, require, verify-ca or verify-full")
+	}
+
+	return nil
+}
+
+func (dc DataConfig) verify() error {
+	if dc.CommitPatches && !dc.CommitDeltas {
+		return errors.New("commit patches may only be specified along with commit deltas")
 	}
 
 	return nil
