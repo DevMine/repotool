@@ -9,38 +9,57 @@
 metadata (such as VCS type, commits and so on) and produces JSON objects out of
 it.  It is also able to store repository information into a database.
 
+A repository contains a list of commits that may contain, if you enable this
+option, a list of deltas. A delta contains information about a file
+touched by a commit. It may also contain patches if specified via an option.
+
 Currently, only [git](http://git-scm.com/) is supported.
 
-Below is an example of the data produced:
+Below is an example of the data produced, without commit deltas and patches:
 
 ```
 {
-  "name": "crawld",
+  "name": "repotool",
   "vcs": "git",
-  "clone_url": "https://github.com/DevMine/crawld.git",
-  "clone_path": "/home/robin/Hacking/crawld",
+  "clone_url": "https://github.com/DevMine/repotool.git",
+  "clone_path": "/home/robin/Hacking/repotool",
   "default_branch": "master",
   "commits": [
     {
-      "vcs_id": "ba79fdaf602df3330d34dc9f8c4e581e324dbc92",
-      "message": "doc: add missing package documentation\n",
+      "vcs_id": "df55def5e6185447c6bd360ec1144a847d73b986",
+      "message": "repotool: Add possibility to insert commit diff deltas into the db.\n\nFor this purpose, create a new 'commit_diff_deltas' table.\n",
       "author": {
-        "name": "Kevin Gillieron",
-        "email": "kevin.gillieron@gw-computing.net"
+        "name": "Robin Hahling",
+        "email": "robin.hahling@gw-computing.net"
       },
       "committer": {
-        "name": "Kevin Gillieron",
-        "email": "kevin.gillieron@gw-computing.net"
+        "name": "Robin Hahling",
+        "email": "robin.hahling@gw-computing.net"
       },
-      "author_date": "2015-01-05T17:14:42+01:00",
-      "commit_date": "2015-01-05T17:14:49+01:00",
-      "file_changed_count": 4,
-      "insertions_count": 6,
-      "deletions_count": 0
+      "author_date": "2015-01-14T18:12:47+01:00",
+      "commit_date": "2015-01-14T18:12:47+01:00",
+      "file_changed_count": 2,
+      "insertions_count": 89,
+      "deletions_count": 2
     },
+    ...
+  ]
+}
+```
+
+And with deltas enabled (without patches):
+
+```
+{
+  "name": "repotool",
+  "vcs": "git",
+  "clone_url": "https://github.com/DevMine/repotool.git",
+  "clone_path": "/home/robin/Hacking/repotool",
+  "default_branch": "master",
+  "commits": [
     {
-      "vcs_id": "12ae97c091bb8cdeabf89026eefac428819aaed1",
-      "message": "crawlers/github: Add function to check a repository structure.\n\nSome fields of a repository structure are mandatory to us, namely:\n\n- ID\n- Name\n- Language\n- CloneURL\n- Owner (and Owner.Login)\n- Fork\n\nThese fields are required either because their related column in the\ndatabase does not allow NULL values or because they are required for\nfurther API calls. All other fields may be nil.\n",
+      "vcs_id": "863f9ed113f06829359d0fd4040ae4a6b5c1cf5e",
+      "message": "tools/batch: Use a channel to create a pool of tasks for goroutines.\n\nUse a channel on which each tasks (ie call to repotool) is added.\nThis allows to have goroutines picking up tasks from the channel as soon\nas they are done. This way, there is no waiting time as long as there\nare tasks in the pool.\n",
       "author": {
         "name": "Robin Hahling",
         "email": "robin.hahling@gw-computing.net"
@@ -49,11 +68,60 @@ Below is an example of the data produced:
         "name": "Robin Hahling",
         "email": "robin.hahling@gw-computing.net"
       },
-      "author_date": "2015-01-05T16:32:49+01:00",
-      "commit_date": "2015-01-05T16:38:41+01:00",
+      "author_date": "2015-01-13T15:24:40+01:00",
+      "commit_date": "2015-01-13T15:24:40+01:00",
+      "diff_delta": [
+        {
+          "status": "modified",
+          "binary": false,
+          "old_file_path": "tools/batch.go",
+          "new_file_path": "tools/batch.go"
+        }
+      ],
       "file_changed_count": 1,
-      "insertions_count": 83,
-      "deletions_count": 0
+      "insertions_count": 25,
+      "deletions_count": 23
+    },
+    ...
+  ]
+}
+```
+
+And you can even include patches:
+
+```
+{
+  "name": "repotool",
+  "vcs": "git",
+  "clone_url": "https://github.com/DevMine/repotool.git",
+  "clone_path": "/home/robin/Hacking/repotool",
+  "default_branch": "master",
+  "commits": [
+    {
+      "vcs_id": "fe8aaac0c7650d8ce9c8f4ddeaa63105b3dd0e9e",
+      "message": "repotool: Print repository name before processing db insertions.\n",
+      "author": {
+        "name": "Robin Hahling",
+        "email": "robin.hahling@gw-computing.net"
+      },
+      "committer": {
+        "name": "Robin Hahling",
+        "email": "robin.hahling@gw-computing.net"
+      },
+      "author_date": "2015-01-14T18:14:18+01:00",
+      "commit_date": "2015-01-14T18:14:18+01:00",
+      "diff_delta": [
+        {
+          "patch": "diff --git a/repotool.go b/repotool.go\nindex ba1eed0..d1ce7a3 100644\n--- a/repotool.go\n+++ b/repotool.go\n@@ -97,8 +97,9 @@ func main() {\n \t\t}\n \t\tdefer db.Close()\n \n-\t\tfmt.Fprintf(os.Stderr, \"inserting %d commits into the database...\\n\",\n-\t\t\tlen(repository.GetCommits()))\n+\t\tfmt.Fprintf(os.Stderr,\n+\t\t\t\"inserting %d commits from %s repository into the database...\\n\",\n+\t\t\tlen(repository.GetCommits()), repository.GetName())\n \t\ttic := time.Now()\n \t\tinsertRepoData(db, repository)\n \t\ttoc := time.Now()\n",
+          "status": "modified",
+          "binary": false,
+          "old_file_path": "repotool.go",
+          "new_file_path": "repotool.go"
+        }
+      ],
+      "file_changed_count": 1,
+      "insertions_count": 3,
+      "deletions_count": 2
     },
     ...
   ]
@@ -94,6 +162,14 @@ more information about the database schema. Example usage:
 
     repotool -json=false -db -c repotool.conf ~/Code/myawesomeproject
 
+With the configuration file, you can also tell `repotool` to output commit
+deltas and commits patches (the latter works only if you enable commit deltas,
+quite logically). Simply set the `commit_deltas` and, eventually,
+`commit_patches`, to `true`. Be careful with the `commit_patches` option as this
+may rapidly produce a lot of data. Also note that if you plan on inserting data
+into a database, patches are not going to be inserted, whether you set
+`commit_patches` to `true` or not.
+
 If you plan on batch processing multiple repositories, look at `batch.go` in the
 `tools` folder. It can process repositories concurrently by recursively
 traversing directories and calling `repotool`, spawning goroutines in the
@@ -101,4 +177,4 @@ process.  When using it, bear in mind that `repotool` is IO and CPU intensive,
 hence do not spawn too many goroutines or you might reach the number of open
 files limit. The number of goroutines can be adjusted with the `-g` parameter.
 Using about the same number of goroutines as the number of cpu cores should be a
-reasonnable choice.
+reasonable choice.
