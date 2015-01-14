@@ -3,6 +3,9 @@
 *.prename
 *.swp
 
+.directory
+.DS_Store
+
 repotool
 repotool.conf
 log
