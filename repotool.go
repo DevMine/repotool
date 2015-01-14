@@ -91,7 +91,7 @@ func main() {
 	}
 
 	if *dbflag {
-		db, err := OpenDBSession(cfg.Database)
+		db, err := openDBSession(cfg.Database)
 		if err != nil {
 			fatal(err)
 		}
@@ -112,8 +112,8 @@ func fatal(a ...interface{}) {
 	os.Exit(1)
 }
 
-// OpenDBSession creates a session to the database.
-func OpenDBSession(cfg config.DatabaseConfig) (*sql.DB, error) {
+// openDBSession creates a session to the database.
+func openDBSession(cfg config.DatabaseConfig) (*sql.DB, error) {
 	dbURL := fmt.Sprintf(
 		"user='%s' password='%s' host='%s' port=%d dbname='%s' sslmode='%s'",
 		cfg.UserName, cfg.Password, cfg.HostName, cfg.Port, cfg.DBName, cfg.SSLMode)
