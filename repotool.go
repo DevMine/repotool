@@ -97,8 +97,9 @@ func main() {
 		}
 		defer db.Close()
 
-		fmt.Fprintf(os.Stderr, "inserting %d commits into the database...\n",
-			len(repository.GetCommits()))
+		fmt.Fprintf(os.Stderr,
+			"inserting %d commits from %s repository into the database...\n",
+			len(repository.GetCommits()), repository.GetName())
 		tic := time.Now()
 		insertRepoData(db, repository)
 		toc := time.Now()
