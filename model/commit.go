@@ -14,6 +14,7 @@ type Commit struct {
 	Committer        Developer `json:"committer"`
 	AuthorDate       time.Time `json:"author_date"`
 	CommitDate       time.Time `json:"commit_date"`
+	Patches          []string  `json:"patches,omitempty"`
 	FileChangedCount int       `json:"file_changed_count"`
 	InsertionsCount  int       `json:"insertions_count"`
 	DeletionsCount   int       `json:"deletions_count"`

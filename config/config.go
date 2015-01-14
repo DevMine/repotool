@@ -25,6 +25,7 @@ var sslModes = map[string]bool{
 // Config is the main configuration structure.
 type Config struct {
 	Database DatabaseConfig `json:"database"`
+	Data     DataConfig     `json:"data"`
 }
 
 // DatabaseConfig is a configuration for PostgreSQL database connection
@@ -38,6 +39,11 @@ type DatabaseConfig struct {
 
 	// Can take values: disable, require, verify-ca or verify-full
 	SSLMode string `json:"ssl_mode"`
+}
+
+// DataConfig is used to specify some data to retrieve or not.
+type DataConfig struct {
+	CommitPatches bool `json:"commit_patches"`
 }
 
 // ReadConfig reads a JSON formatted configuration file, verifies the values

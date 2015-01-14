@@ -8,23 +8,25 @@ package git
 import (
 	g2g "github.com/libgit2/git2go"
 
+	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
 )
 
 // GitRepo is a repository with some things specific to git.
 type GitRepo struct {
 	model.Repository
-	r *g2g.Repository
+	cfg config.DataConfig
+	r   *g2g.Repository
 }
 
 // New creates a new GitRepo object.
-func New(repository model.Repository) (*GitRepo, error) {
+func New(cfg config.DataConfig, repository model.Repository) (*GitRepo, error) {
 	r, err := g2g.OpenRepository(repository.ClonePath)
 	if err != nil {
 		return nil, err
 	}
 
-	return &GitRepo{Repository: repository, r: r}, nil
+	return &GitRepo{Repository: repository, cfg: cfg, r: r}, nil
 }
 
 // FetchCommits fetches all commits from a Git repository and adds them to
@@ -140,6 +142,25 @@ func (gr *GitRepo) addCommit(c *g2g.Commit) bool {
 	stats, err := diff.Stats()
 	if err != nil {
 		return false
+	}
+
+	nDeltas, err := diff.NumDeltas()
+	if err != nil {
+		return false
+	}
+
+	for d := 0; d < nDeltas; d++ {
+		if gr.cfg.CommitPatches {
+			patch, err := diff.Patch(d)
+			if err != nil || patch == nil {
+				return false
+			}
+			p, err := patch.String()
+			if err != nil {
+				return false
+			}
+			commit.Patches = append(commit.Patches, p)
+		}
 	}
 
 	commit.FileChangedCount = stats.FilesChanged()

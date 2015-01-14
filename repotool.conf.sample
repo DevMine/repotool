@@ -6,5 +6,8 @@
         "password": "devmine",
         "dbname": "devmine",
         "ssl_mode": "disable"
+    },
+    "data": {
+        "commit_patches": false
     }
 }

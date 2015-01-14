@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
 	"github.com/DevMine/repotool/repo/git"
 )
@@ -56,7 +57,7 @@ type Repo interface {
 }
 
 // New creates a new Repo object.
-func New(path string) (Repo, error) {
+func New(cfg config.DataConfig, path string) (Repo, error) {
 	// check for git repo
 	if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
 		cloneURL, err := extractGitURL(path)
@@ -77,7 +78,7 @@ func New(path string) (Repo, error) {
 			DefaultBranch: *branch,
 		}
 
-		gitRepo, err := git.New(repository)
+		gitRepo, err := git.New(cfg, repository)
 		if err != nil {
 			return nil, err
 		}

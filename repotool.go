@@ -61,8 +61,13 @@ func main() {
 		fatal(errors.New("a configuration file must be specified when using db option"))
 	}
 
+	cfg, err := config.ReadConfig(*configPath)
+	if err != nil {
+		fatal(err)
+	}
+
 	repoPath := flag.Arg(0)
-	repository, err := repo.New(repoPath)
+	repository, err := repo.New(cfg.Data, repoPath)
 	if err != nil {
 		fatal(err)
 	}
@@ -86,11 +91,6 @@ func main() {
 	}
 
 	if *dbflag {
-		cfg, err := config.ReadConfig(*configPath)
-		if err != nil {
-			fatal(err)
-		}
-
 		db, err := OpenDBSession(cfg.Database)
 		if err != nil {
 			fatal(err)
