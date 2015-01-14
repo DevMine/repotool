@@ -8,7 +8,7 @@
         "ssl_mode": "disable"
     },
     "data": {
-        "diff_delta": false,
+        "commit_deltas": false,
         "commit_patches": false
     }
 }

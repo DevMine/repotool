@@ -161,7 +161,7 @@ func (gr *GitRepo) addCommit(c *g2g.Commit) bool {
 		return false
 	}
 
-	if gr.cfg.DiffDelta {
+	if gr.cfg.CommitDeltas {
 		for d := 0; d < nDeltas; d++ {
 			var cdd model.DiffDelta
 

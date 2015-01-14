@@ -43,7 +43,7 @@ type DatabaseConfig struct {
 
 // DataConfig is used to specify some data to retrieve or not.
 type DataConfig struct {
-	DiffDelta     bool `json:"diff_delta"`
+	CommitDeltas  bool `json:"commit_deltas"`
 	CommitPatches bool `json:"commit_patches"`
 }
 
