@@ -84,6 +84,18 @@ func (gr GitRepo) GetCommits() []model.Commit {
 	return gr.Commits
 }
 
+var deltaMap = map[g2g.Delta]*string{
+	g2g.DeltaUnmodified: nil,
+	g2g.DeltaAdded:      &model.StatusAdded,
+	g2g.DeltaDeleted:    &model.StatusDeleted,
+	g2g.DeltaModified:   &model.StatusModified,
+	g2g.DeltaRenamed:    &model.StatusRenamed,
+	g2g.DeltaCopied:     &model.StatusCopied,
+	g2g.DeltaIgnored:    nil,
+	g2g.DeltaUntracked:  nil,
+	g2g.DeltaTypeChange: nil,
+}
+
 // addCommit is conform to the g2g.RevWalIterator type in order to be used
 // by the g2g.Iterate() function to iterate over all commits of a Git repository.
 func (gr *GitRepo) addCommit(c *g2g.Commit) bool {
@@ -149,17 +161,40 @@ func (gr *GitRepo) addCommit(c *g2g.Commit) bool {
 		return false
 	}
 
-	for d := 0; d < nDeltas; d++ {
-		if gr.cfg.CommitPatches {
-			patch, err := diff.Patch(d)
-			if err != nil || patch == nil {
-				return false
+	if gr.cfg.DiffDelta {
+		for d := 0; d < nDeltas; d++ {
+			var cdd model.DiffDelta
+
+			if gr.cfg.CommitPatches {
+				patch, err := diff.Patch(d)
+				if err != nil || patch == nil {
+					return false
+				}
+				p, err := patch.String()
+				if err != nil {
+					return false
+				}
+				cdd.Patch = &p
 			}
-			p, err := patch.String()
+
+			diffDelta, err := diff.GetDelta(d)
 			if err != nil {
 				return false
 			}
-			commit.Patches = append(commit.Patches, p)
+			cdd.Status = deltaMap[diffDelta.Status]
+
+			var isBin bool
+			if (diffDelta.Flags & g2g.DiffFlagBinary) > 0 {
+				isBin = true
+			}
+			cdd.Binary = &isBin
+
+			// TODO compute similarity to add to cdd.Similarity
+
+			cdd.OldFilePath = &diffDelta.OldFile.Path
+			cdd.NewFilePath = &diffDelta.NewFile.Path
+
+			commit.DiffDelta = append(commit.DiffDelta, cdd)
 		}
 	}
 

@@ -43,12 +43,17 @@ type DatabaseConfig struct {
 
 // DataConfig is used to specify some data to retrieve or not.
 type DataConfig struct {
+	DiffDelta     bool `json:"diff_delta"`
 	CommitPatches bool `json:"commit_patches"`
 }
 
 // ReadConfig reads a JSON formatted configuration file, verifies the values
 // of the configuration parameters and fills the Config structure.
 func ReadConfig(path string) (*Config, error) {
+	if len(path) == 0 {
+		return &Config{}, nil
+	}
+
 	// TODO maybe use a safer function like io.Copy
 	bs, err := ioutil.ReadFile(path)
 	if err != nil {

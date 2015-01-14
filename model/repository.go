@@ -6,10 +6,24 @@ package model
 
 // Repository represents a source code repository.
 type Repository struct {
-	Name          string   `json:"name"`
-	VCS           string   `json:"vcs"`
-	CloneURL      string   `json:"clone_url"`
-	ClonePath     string   `json:"clone_path"`
-	DefaultBranch string   `json:"default_branch"`
-	Commits       []Commit `json:"commits"`
+	// Name is the name of the repository.
+	Name string `json:"name"`
+
+	// VCS is the VCS type of the repository (Git, Mercurial, ...).
+	VCS string `json:"vcs"`
+
+	// CloneURL represents the URL from which the repository was cloned.
+	CloneURL string `json:"clone_url"`
+
+	// ClonePath is the absolute path to which the repository was cloned
+	// on the file system.
+	ClonePath string `json:"clone_path"`
+
+	// DefaultBranch is the branch that was active when the repository
+	// information were obtained..
+	DefaultBranch string `json:"default_branch"`
+
+	// Commits is the list of commits of a repository.
+	// Note that only the commit of the default branch are retrieved.
+	Commits []Commit `json:"commits"`
 }
