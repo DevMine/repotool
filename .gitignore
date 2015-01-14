@@ -1,6 +1,7 @@
 *~
-*.swp
+*.json
 *.prename
+*.swp
 
 repotool
 repotool.conf
