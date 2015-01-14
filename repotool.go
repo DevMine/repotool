@@ -157,11 +157,34 @@ func insertCommit(db *sql.DB, repoID int, c model.Commit) {
 	committerID := getUserID(db, c.Committer.Email)
 	hash := genCommitHash(c)
 
+	var commitID int64
 	query := genInsQuery("commits", commitFields...)
-	_, err := db.Exec(query,
+	err := db.QueryRow(query+" RETURNING id",
 		repoID, authorID, committerID, hash,
 		c.VCSID, c.Message, c.AuthorDate, c.CommitDate,
-		c.FileChangedCount, c.InsertionsCount, c.DeletionsCount)
+		c.FileChangedCount, c.InsertionsCount, c.DeletionsCount).Scan(&commitID)
+	if err != nil {
+		fatal(err)
+	}
+
+	for _, d := range c.DiffDelta {
+		insertDiffDelta(db, commitID, d)
+	}
+}
+
+// insertDiffDelta inserts a commit diff delta into the database.
+func insertDiffDelta(db *sql.DB, commitID int64, d model.DiffDelta) {
+	diffDeltaFields := []string{
+		"commit_id",
+		"file_status",
+		"is_file_binary",
+		"similarity",
+		"old_file_path",
+		"new_file_path"}
+
+	query := genInsQuery("commit_diff_deltas", diffDeltaFields...)
+	_, err := db.Exec(query,
+		commitID, d.Status, d.Binary, d.Similarity, d.OldFilePath, d.NewFilePath)
 	if err != nil {
 		fatal(err)
 	}
