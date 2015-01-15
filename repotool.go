@@ -126,6 +126,9 @@ func main() {
 
 		p.Repo = repository.GetRepository()
 		bs, err = src.Marshal(p)
+		if err != nil {
+			fatal(err)
+		}
 
 		fmt.Println(string(bs))
 	}
