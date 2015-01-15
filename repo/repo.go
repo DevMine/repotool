@@ -37,6 +37,9 @@ type Repo interface {
 	// fetchCommits populates Commits attribute with all commits of a repository.
 	FetchCommits() error
 
+	// GetRepository returns a repository structure from a repo.
+	GetRepository() *model.Repository
+
 	// GetName returns the name of a repo.
 	GetName() string
 

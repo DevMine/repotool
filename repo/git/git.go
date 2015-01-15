@@ -52,6 +52,11 @@ func (gr *GitRepo) FetchCommits() error {
 	return nil
 }
 
+// GetRepository returns the repository structre contained in a git repository.
+func (gr GitRepo) GetRepository() *model.Repository {
+	return &gr.Repository
+}
+
 // GetName returns the name of a git repository.
 func (gr GitRepo) GetName() string {
 	return gr.Name
