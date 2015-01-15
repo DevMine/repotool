@@ -18,6 +18,7 @@ deps:
 		git submodule update --init && make install
 	go get -u github.com/lib/pq
 	go get -u github.com/spaolacci/murmur3
+	go get -u github.com/DevMine/srcanlzr/src
 
 check:
 	go vet ${PKG}/...

@@ -10,6 +10,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"database/sql"
 	"encoding/hex"
@@ -26,6 +27,8 @@ import (
 
 	_ "github.com/lib/pq"
 	mmh3 "github.com/spaolacci/murmur3"
+
+	"github.com/DevMine/srcanlzr/src"
 
 	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
@@ -45,6 +48,7 @@ func main() {
 	vflag := flag.Bool("v", false, "print version.")
 	jsonflag := flag.Bool("json", true, "json output")
 	dbflag := flag.Bool("db", false, "import data into the database")
+	srctoolflag := flag.String("srctool", "", "read json file produced by srctool (give stdin to read from stdin)")
 	flag.Parse()
 
 	if *vflag {
@@ -59,6 +63,10 @@ func main() {
 
 	if *dbflag && len(*configPath) == 0 {
 		fatal(errors.New("a configuration file must be specified when using db option"))
+	}
+
+	if !*jsonflag && (len(*srctoolflag) > 0) {
+		fatal(errors.New("srctool flag may be used only in conjonction with json flag"))
 	}
 
 	cfg, err := config.ReadConfig(*configPath)
@@ -81,11 +89,43 @@ func main() {
 	toc := time.Now()
 	fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
 
-	if *jsonflag {
+	if *jsonflag && (len(*srctoolflag) == 0) {
 		bs, err := json.Marshal(repository)
 		if err != nil {
 			fatal(err)
 		}
+		fmt.Println(string(bs))
+	}
+
+	if *jsonflag && (len(*srctoolflag)) > 0 {
+		var bs []byte
+		var r *bufio.Reader
+		buf := new(bytes.Buffer)
+
+		if *srctoolflag == strings.ToLower("stdin") {
+			// read from stdin
+			r = bufio.NewReader(os.Stdin)
+		} else {
+			// read from srctool json file
+			var f *os.File
+			if f, err = os.Open(*srctoolflag); err != nil {
+				fatal(err)
+			}
+			r = bufio.NewReader(f)
+		}
+
+		if _, err = io.Copy(buf, r); err != nil {
+			fatal(err)
+		}
+		bs = buf.Bytes()
+
+		p, err := src.Unmarshal(bs)
+		if err != nil {
+			fatal(err)
+		}
+
+		p.Repo = repository.GetRepository()
+		bs, err = src.Marshal(p)
 
 		fmt.Println(string(bs))
 	}
