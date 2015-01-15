@@ -59,6 +59,8 @@ type Repo interface {
 	GetCommits() []model.Commit
 }
 
+var _ Repo = (*git.GitRepo)(nil)
+
 // New creates a new Repo object.
 func New(cfg config.DataConfig, path string) (Repo, error) {
 	// check for git repo
