@@ -20,9 +20,12 @@ deps:
 	go get -u github.com/spaolacci/murmur3
 	go get -u github.com/DevMine/srcanlzr/src
 
+dev-deps:
+	go get -u github.com/golang/lint/golint
+
 check:
 	go vet ${PKG}/...
-	golint ${GOPATH}/src/${PKG}/...
+	golint ${PKG}/...
 
 cover:
 	go test -cover ${PKG}/...
