@@ -242,6 +242,8 @@ func insertDiffDelta(db *sql.DB, commitID int64, d model.DiffDelta) {
 
 // genCommitHash generates a hash (mmh3) from commit fields.
 // This hash can then be used to uniquely identify a commit.
+// Typically, we want to make sure not to insert twice the same commit into the
+// database after an eventual second repotool run on the same repository.
 func genCommitHash(c model.Commit) string {
 	h := mmh3.New128()
 
