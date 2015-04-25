@@ -57,7 +57,7 @@ CREATE TABLE commits (
     author_id bigint,
     committer_id bigint,
     hash character varying NOT NULL,
-    vcs_id character varying,
+    vcs_id character varying NOT NULL,
     message text,
     author_date timestamp with time zone,
     commit_date timestamp with time zone,
@@ -117,11 +117,11 @@ ALTER TABLE ONLY commits
 
 
 --
--- Name: commits_unique_hash; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: commits_unique_hash_and_vcs_id; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY commits
-    ADD CONSTRAINT commits_unique_hash UNIQUE (hash);
+    ADD CONSTRAINT commits_unique_hash_and_vcs_id UNIQUE (hash, vcs_id);
 
 
 --
