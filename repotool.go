@@ -156,6 +156,11 @@ func fatal(a ...interface{}) {
 	os.Exit(1)
 }
 
+// fail prints an error on standard error stream.
+func fail(a ...interface{}) {
+	fmt.Fprintln(os.Stderr, a...)
+}
+
 // openDBSession creates a session to the database.
 func openDBSession(cfg config.DatabaseConfig) (*sql.DB, error) {
 	dbURL := fmt.Sprintf(
@@ -208,7 +213,8 @@ func insertCommit(db *sql.DB, repoID int, c model.Commit) {
 		c.VCSID, c.Message, c.AuthorDate, c.CommitDate,
 		c.FileChangedCount, c.InsertionsCount, c.DeletionsCount).Scan(&commitID)
 	if err != nil {
-		fatal(err)
+		fail(err)
+		return
 	}
 
 	for _, d := range c.DiffDelta {
@@ -230,7 +236,7 @@ func insertDiffDelta(db *sql.DB, commitID int64, d model.DiffDelta) {
 	_, err := db.Exec(query,
 		commitID, d.Status, d.Binary, d.Similarity, d.OldFilePath, d.NewFilePath)
 	if err != nil {
-		fatal(err)
+		fail(err)
 	}
 }
 
