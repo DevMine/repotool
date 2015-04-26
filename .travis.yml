@@ -7,5 +7,5 @@ go:
     - 1.4
     - tip
 
-install: make deps && make install
+install: GOPATH="${HOME}/gopath" make deps && make install
 script: make test
