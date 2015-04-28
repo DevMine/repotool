@@ -37,6 +37,30 @@ import (
 
 const version = "0.1.0"
 
+// database fields per tables
+var (
+	diffDeltaFields = []string{
+		"commit_id",
+		"file_status",
+		"is_file_binary",
+		"similarity",
+		"old_file_path",
+		"new_file_path"}
+
+	commitFields = []string{
+		"repository_id",
+		"author_id",
+		"committer_id",
+		"hash",
+		"vcs_id",
+		"message",
+		"author_date",
+		"commit_date",
+		"file_changed_count",
+		"insertions_count",
+		"deletions_count"}
+)
+
 func main() {
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [OPTION(S)] [REPOSITORY PATH]\n", os.Args[0])
@@ -189,19 +213,6 @@ func insertRepoData(db *sql.DB, r repo.Repo) {
 
 // insertCommit inserts a commit into the database
 func insertCommit(db *sql.DB, repoID int, c model.Commit) {
-	commitFields := []string{
-		"repository_id",
-		"author_id",
-		"committer_id",
-		"hash",
-		"vcs_id",
-		"message",
-		"author_date",
-		"commit_date",
-		"file_changed_count",
-		"insertions_count",
-		"deletions_count"}
-
 	authorID := getUserID(db, c.Author.Email)
 	committerID := getUserID(db, c.Committer.Email)
 	hash := genCommitHash(c)
@@ -224,14 +235,6 @@ func insertCommit(db *sql.DB, repoID int, c model.Commit) {
 
 // insertDiffDelta inserts a commit diff delta into the database.
 func insertDiffDelta(db *sql.DB, commitID int64, d model.DiffDelta) {
-	diffDeltaFields := []string{
-		"commit_id",
-		"file_status",
-		"is_file_binary",
-		"similarity",
-		"old_file_path",
-		"new_file_path"}
-
 	query := genInsQuery("commit_diff_deltas", diffDeltaFields...)
 	_, err := db.Exec(query,
 		commitID, d.Status, d.Binary, d.Similarity, d.OldFilePath, d.NewFilePath)
