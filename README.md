@@ -169,11 +169,11 @@ may rapidly produce a lot of data. Also note that if you plan on inserting data
 into a database, patches are not going to be inserted, whether you set
 `commit_patches` to `true` or not.
 
-If you plan on batch processing multiple repositories, look at `batch.go` in the
-`tools` folder. It can process repositories concurrently by recursively
-traversing directories and calling `repotool`, spawning goroutines in the
-process.  When using it, bear in mind that `repotool` is IO and CPU intensive,
-hence do not spawn too many goroutines or you might reach the number of open
-files limit. The number of goroutines can be adjusted with the `-g` parameter.
-Using about the same number of goroutines as the number of cpu cores should be a
-reasonable choice.
+If you plan on batch processing multiple repositories, see
+[batch-repotool.go](https://github.com/DevMine/devmine/blob/master/tools/batch-repotool.go).
+It can process repositories concurrently by recursively traversing directories
+and calling `repotool`, spawning goroutines in the process.  When using it, bear
+in mind that `repotool` is IO and CPU intensive, hence do not spawn too many
+goroutines or you might reach the number of open files limit. The number of
+goroutines can be adjusted with the `-g` parameter.  Using about the same number
+of goroutines as the number of cpu cores should be a reasonable choice.
