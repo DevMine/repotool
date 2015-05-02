@@ -18,7 +18,7 @@ deps:
 	go get -u github.com/libgit2/git2go
 	go get -u github.com/lib/pq
 	go get -u github.com/spaolacci/murmur3
-	go get -u github.com/DevMine/srcanlzr/src
+	go get -u -f github.com/DevMine/srcanlzr/src
 
 dev-deps:
 	go get -u github.com/golang/lint/golint
