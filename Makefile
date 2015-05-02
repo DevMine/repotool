@@ -12,12 +12,10 @@ build:
 test:
 	go test ${PKG}/...
 
+# FIXME: we shall compile libgit2 statically with git2go to prevent libgit2
+# from being a dependency to run repotool
 deps:
-	go get -d github.com/libgit2/git2go && \
-		cd "${GOPATH}/src/github.com/libgit2/git2go" && \
-		git checkout next && \
-		git submodule update --init && \
-		make install
+	go get -u github.com/libgit2/git2go
 	go get -u github.com/lib/pq
 	go get -u github.com/spaolacci/murmur3
 	go get -u github.com/DevMine/srcanlzr/src
