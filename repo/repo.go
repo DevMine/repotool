@@ -56,6 +56,9 @@ type Repo interface {
 
 	// GetCommits returns the list of commits of a repo.
 	GetCommits() []model.Commit
+
+	// Do some housekeeping
+	CleanUp() error
 }
 
 var _ Repo = (*gitRepo)(nil)

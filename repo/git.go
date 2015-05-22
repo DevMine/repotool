@@ -5,6 +5,15 @@
 package repo
 
 import (
+	"archive/tar"
+	"errors"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
 	g2g "github.com/libgit2/git2go"
 
 	"github.com/DevMine/repotool/config"
@@ -14,18 +23,20 @@ import (
 // gitRepo is a repository with some things specific to git.
 type gitRepo struct {
 	model.Repository
-	cfg config.DataConfig
-	r   *g2g.Repository
+	cfg    config.DataConfig
+	r      *g2g.Repository
+	gitDir string
 }
 
 // New creates a new gitRepo object.
-func newGitRepo(cfg config.DataConfig, repository model.Repository) (*gitRepo, error) {
-	r, err := g2g.OpenRepository(repository.ClonePath)
+func newGitRepo(cfg config.Config, repository model.Repository, gitDir string) (*gitRepo, error) {
+	r, err := g2g.OpenRepository(gitDir)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return &gitRepo{Repository: repository, cfg: cfg, r: r}, nil
+	return &gitRepo{Repository: repository, cfg: cfg.Data, r: r}, nil
 }
 
 // FetchCommits fetches all commits from a Git repository and adds them to
@@ -86,6 +97,12 @@ func (gr gitRepo) GetDefaultBranch() string {
 // FetchCommits() is needed to populate the list.
 func (gr gitRepo) GetCommits() []model.Commit {
 	return gr.Commits
+}
+
+// CleanUp frees open repositories and removes temporary created files.
+func (gr gitRepo) CleanUp() error {
+	gr.r.Free()
+	return os.RemoveAll(gr.gitDir)
 }
 
 var deltaMap = map[g2g.Delta]*string{
@@ -209,4 +226,125 @@ func (gr *gitRepo) addCommit(c *g2g.Commit) bool {
 	gr.Commits = append(gr.Commits, commit)
 
 	return true
+}
+
+// extractGitURL returns a git repository clone URL as a string, given the
+// path to its location on disk.
+func extractGitURL(path string) (*string, error) {
+	f, err := os.Open(filepath.Join(path, ".git", "config"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	bs, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	re := regexp.MustCompile("url ?= ?(.+)")
+	match := re.FindStringSubmatch(string(bs))
+	if len(match) != 2 {
+		return nil, errors.New("invalid git config file")
+	}
+
+	if len(match[1]) == 0 {
+		return nil, errors.New("cannot extract git clone url")
+	}
+
+	return &match[1], nil
+}
+
+// extractGitDefaultBranch returns the branch to which HEAD of a git
+// repository is pointing at.
+func extractGitDefaultBranch(path string) (*string, error) {
+	f, err := os.Open(filepath.Join(path, ".git", "HEAD"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	bs, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	re := regexp.MustCompile("ref: refs\\/heads\\/[a-zA-Z0-9].+")
+	match := re.FindString(string(bs))
+	if len(match) == 0 {
+		return nil, errors.New("no branch (detached HEAD state)")
+	}
+
+	index := strings.LastIndex(match, "/")
+	branch := string(match[index+1:])
+	if len(branch) == 0 {
+		// we shall not be able to reach here but just in case
+		return nil, errors.New("no branch (detached HEAD state)")
+	}
+
+	return &branch, nil
+}
+
+// untarGitFolder untar the .git contained in a tar archive in a temporary file
+// and returns the path to that directory
+func untarGitFolder(tmpDir string, archivePath string) (string, error) {
+	prefix := "repotool"
+	destPath, err := ioutil.TempDir(tmpDir, prefix)
+
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer archiveFile.Close()
+
+	tr := tar.NewReader(archiveFile)
+
+	for {
+		hdr, err := tr.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return "", err
+		}
+
+		if strings.Contains(hdr.Name, ".git") {
+			mode := hdr.FileInfo().Mode()
+			switch {
+			case mode&os.ModeDir != 0:
+				if err := os.Mkdir(filepath.Join(destPath, hdr.Name), mode); err != nil {
+					return "", err
+				}
+			case mode&os.ModeSymlink != 0:
+				os.Symlink(hdr.Linkname, filepath.Join(destPath, hdr.Name))
+			default: // consider it a regular file
+				f, err := os.Create(filepath.Join(destPath, hdr.Name))
+				if err != nil {
+					return "", err
+				}
+				defer f.Close()
+
+				buf := make([]byte, 8192)
+				for {
+					nr, err := tr.Read(buf)
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						return "", err
+					}
+
+					nw, err := f.Write(buf[:nr])
+					if err != nil {
+						return "", err
+					}
+					if nr != nw {
+						return "", errors.New("write error: not enough (or too many) bytes written")
+					}
+				}
+			}
+		}
+	}
+
+	return destPath, nil
 }

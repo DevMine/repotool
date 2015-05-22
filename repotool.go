@@ -103,6 +103,7 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+	defer repository.CleanUp()
 
 	fmt.Fprintln(os.Stderr, "fetching repository commits...")
 	tic := time.Now()
@@ -172,6 +173,7 @@ func main() {
 		toc := time.Now()
 		fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
 	}
+
 }
 
 // fatal prints an error on standard error stream and exits.
