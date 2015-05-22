@@ -10,5 +10,6 @@
     "data": {
         "commit_deltas": false,
         "commit_patches": false
-    }
+    },
+	"tmpDir": ""
 }

@@ -26,6 +26,7 @@ var sslModes = map[string]bool{
 type Config struct {
 	Database DatabaseConfig `json:"database"`
 	Data     DataConfig     `json:"data"`
+	TmpDir   string         `json:"tmpDir"`
 }
 
 // DatabaseConfig is a configuration for PostgreSQL database connection
