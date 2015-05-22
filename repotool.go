@@ -99,7 +99,7 @@ func main() {
 	}
 
 	repoPath := flag.Arg(0)
-	repository, err := repo.New(cfg.Data, repoPath)
+	repository, err := repo.New(*cfg, repoPath)
 	if err != nil {
 		fatal(err)
 	}
