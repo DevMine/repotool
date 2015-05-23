@@ -9,6 +9,7 @@ import (
 	"archive/tar"
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,8 +78,13 @@ func New(cfg config.Config, path string) (Repo, error) {
 	case Git:
 		tmpPath := path
 		if strings.HasSuffix(path, ".tar") {
-			tmpPath, err = untarGitFolder(cfg.TmpDir, path)
+			tmpPath, err := ioutil.TempDir(cfg.TmpDir, "repotool-git-")
 			if err != nil {
+				return nil, err
+			}
+
+			if err = untarGitFolder(tmpPath, path); err != nil {
+				_ = os.RemoveAll(tmpPath)
 				return nil, err
 			}
 			path = strings.TrimSuffix(path, ".tar")

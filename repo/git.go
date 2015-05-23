@@ -285,66 +285,82 @@ func extractGitDefaultBranch(path string) (*string, error) {
 	return &branch, nil
 }
 
-// untarGitFolder untar the .git contained in a tar archive in a temporary file
-// and returns the path to that directory
-func untarGitFolder(tmpDir string, archivePath string) (string, error) {
-	prefix := "repotool"
-	destPath, err := ioutil.TempDir(tmpDir, prefix)
+// untarGitFolder extract the root's .git directory contained in a tar archive
+// of a git repository into destPath.
+func untarGitFolder(destPath string, archivePath string) error {
+	var err error
 
 	archiveFile, err := os.Open(archivePath)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer archiveFile.Close()
 
+	// make sure to create dest path
+	if err = os.MkdirAll(destPath, os.ModePerm); err != nil {
+		return err
+	}
+
 	tr := tar.NewReader(archiveFile)
 
+	// make sure we keep the trailing /
+	// FIXME not compatible with Windows
+	basePath := filepath.Base(strings.TrimSuffix(archivePath, ".tar"))
+	dotGitDirPath := filepath.Join(basePath, ".git") + "/"
 	for {
 		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return "", err
+			return err
 		}
 
-		if strings.Contains(hdr.Name, ".git") {
+		// we only want to extract the .git/ subtree and skip the rest
+		if strings.HasPrefix(hdr.Name, dotGitDirPath) {
+			hdr.Name = strings.TrimPrefix(hdr.Name, basePath)
 			mode := hdr.FileInfo().Mode()
 			switch {
 			case mode&os.ModeDir != 0:
 				if err := os.Mkdir(filepath.Join(destPath, hdr.Name), mode); err != nil {
-					return "", err
+					return err
 				}
 			case mode&os.ModeSymlink != 0:
 				os.Symlink(hdr.Linkname, filepath.Join(destPath, hdr.Name))
 			default: // consider it a regular file
-				f, err := os.Create(filepath.Join(destPath, hdr.Name))
-				if err != nil {
-					return "", err
+				createFile := func() error {
+					f, err := os.Create(filepath.Join(destPath, hdr.Name))
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+
+					buf := make([]byte, 8192)
+					for {
+						nr, err := tr.Read(buf)
+						if err == io.EOF {
+							return nil
+						}
+						if err != nil {
+							return err
+						}
+
+						nw, err := f.Write(buf[:nr])
+						if err != nil {
+							return err
+						}
+						if nr != nw {
+							return errors.New("write error: not enough (or too many) bytes written")
+						}
+					}
 				}
-				defer f.Close()
 
-				buf := make([]byte, 8192)
-				for {
-					nr, err := tr.Read(buf)
-					if err == io.EOF {
-						break
-					}
-					if err != nil {
-						return "", err
-					}
-
-					nw, err := f.Write(buf[:nr])
-					if err != nil {
-						return "", err
-					}
-					if nr != nw {
-						return "", errors.New("write error: not enough (or too many) bytes written")
-					}
+				if err = createFile(); err != nil {
+					return err
 				}
 			}
 		}
 	}
 
-	return destPath, nil
+	return nil
 }
