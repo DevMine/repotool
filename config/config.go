@@ -30,7 +30,7 @@ type Config struct {
 	// TmpDir can be used to specify a temporary working directory. If
 	// left unspecified, the default system temporary directory will be used.
 	// If you have a ramdisk, you are advised to use it here.
-	TmpDir string `json:"tmpDir"`
+	TmpDir string `json:"tmp_dir"`
 }
 
 // DatabaseConfig is a configuration for PostgreSQL database connection
