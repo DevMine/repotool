@@ -131,14 +131,11 @@ And you can even include patches:
 
 `repotool` depends on [git2go](https://github.com/libgit2/git2go), which is a
 [Go](http://golang.org/) binding to [libgit2](https://libgit2.github.com/), a C
-library that implements `git` core methods.
+library that implements `git` core methods. Hence, you need `libgit2` installed
+on your system unless you statically compile `libgit2` into `git2go`.
 
-`git2go` needs to be installed as described in their
-[README.md](https://github.com/libgit2/git2go/blob/master/README.md#installing)
-in order to statically link `libgit2` to the `git2go` package.
-
-To install `repotool`, run this command in a terminal, assuming
-[Go](http://golang.org/) is installed:
+If the requirements are met, installing `repotool` is as simple as running this
+command in a terminal (assuming [Go](http://golang.org/) is installed):
 
     go get github.com/DevMine/repotool
 
