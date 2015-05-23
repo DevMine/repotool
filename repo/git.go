@@ -287,7 +287,7 @@ func extractGitDefaultBranch(path string) (*string, error) {
 
 // untarGitFolder extracts the root's .git directory contained in a tar archive
 // of a git repository into destPath.
-func untarGitFolder(destPath string, archivePath string) error {
+func untarGitFolder(destPath, archivePath string) error {
 	var err error
 
 	archiveFile, err := os.Open(archivePath)
