@@ -145,7 +145,8 @@ Or you can download a binary for your platform from the DevMine project's
 ## Usage
 
 `repotool` produces JSON, provided that you feed it with a path to a source code
-repository. By default, informative messages are outputted to `stderr` whereas
+repository managed by a VCS which can be either in the form of a directory or a
+tar archive. By default, informative messages are outputted to `stderr` whereas
 JSON is outputted to `stdout`. Example usage:
 
     repotool ~/Code/myawesomeproject > myawesomeproject.json
@@ -165,6 +166,12 @@ quite logically). Simply set the `commit_deltas` and, eventually,
 may rapidly produce a lot of data. Also note that if you plan on inserting data
 into a database, patches are not going to be inserted, whether you set
 `commit_patches` to `true` or not.
+
+As `libgit2` does not support reading information directly from a tar archive,
+when given a git repository as a tar archive, `repotool` will extract part of
+the archive into a temporary location. You can specify where using `tmp_dir`
+in the configuration file. We advise specifying a path to a ramdisk for
+increased performance and reduced main storage I/Os.
 
 If you plan on batch processing multiple repositories, see
 [batch-repotool.go](https://github.com/DevMine/devmine/blob/master/tools/batch-repotool.go).
