@@ -78,7 +78,7 @@ func New(cfg config.Config, path string) (Repo, error) {
 	case Git:
 		tmpPath := path
 		if strings.HasSuffix(path, ".tar") {
-			tmpPath, err := ioutil.TempDir(cfg.TmpDir, "repotool-git-")
+			tmpPath, err = ioutil.TempDir(cfg.TmpDir, "repotool-git-")
 			if err != nil {
 				return nil, err
 			}
