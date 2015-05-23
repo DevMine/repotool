@@ -68,9 +68,13 @@ var _ Repo = (*gitRepo)(nil)
 func New(cfg config.Config, path string) (Repo, error) {
 	var repo Repo
 
-	// check for git repo
-	if vcs, err := detectVCS(path); err == nil {
+	vcs, err := detectVCS(path)
+	if err != nil {
+		return nil, err
+	}
 
+	switch vcs {
+	case Git:
 		tmpPath := path
 		if strings.HasSuffix(path, ".tar") {
 			tmpPath, err = untarGitFolder(cfg.TmpDir, path)
@@ -107,14 +111,19 @@ func New(cfg config.Config, path string) (Repo, error) {
 	return nil, errors.New("unsupported repository type")
 }
 
-// detect vcs used
+// detectVCS attempts at detecting the VCS of the repository. It can take
+// either a directory or a tar archive version of a repository as argument.
 func detectVCS(path string) (string, error) {
+	// check tar archive case
 	if strings.HasSuffix(path, ".tar") {
 		archiveFile, err := os.Open(path)
 		if err != nil {
 			return "", err
 		}
 		defer archiveFile.Close()
+
+		// only the relative path shall be stored in the archive
+		path = filepath.Base(strings.TrimSuffix(path, ".tar"))
 
 		tr := tar.NewReader(archiveFile)
 
@@ -126,12 +135,24 @@ func detectVCS(path string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if strings.Contains(hdr.Name, ".git") {
-				return Git, nil
+
+			mode := hdr.FileInfo().Mode()
+			if mode&os.ModeDir != 0 {
+				// remove trailing /, if any
+				dir := strings.TrimSuffix(hdr.Name, "/")
+				switch dir {
+				// is it a git repository?
+				// (only the archive root's .git directory is valid for the check)
+				case filepath.Join(path, ".git"):
+					return Git, nil
+				}
 			}
 		}
-	} else if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
-		return Git, nil
+	} else {
+		// is it a git repository?
+		if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
+			return Git, nil
+		}
 	}
 
 	return "", errors.New("VCS type not found")
