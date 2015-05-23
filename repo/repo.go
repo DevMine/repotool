@@ -33,7 +33,7 @@ var suppVCS = []string{
 
 // Repo interface defines what needs to be implemented to construct a Repo object.
 type Repo interface {
-	// fetchCommits populates Commits attribute with all commits of a repository.
+	// FetchCommits populates Commits attribute with all commits of a repository.
 	FetchCommits() error
 
 	// GetRepository returns a repository structure from a repo.
@@ -57,8 +57,9 @@ type Repo interface {
 	// GetCommits returns the list of commits of a repo.
 	GetCommits() []model.Commit
 
-	// Do some housekeeping
-	CleanUp() error
+	// Cleanup needs to be called when done using the repository. It performs
+	// some housekeeping if necessary.
+	Cleanup() error
 }
 
 var _ Repo = (*gitRepo)(nil)

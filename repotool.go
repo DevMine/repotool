@@ -103,7 +103,7 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	defer repository.CleanUp()
+	defer repository.Cleanup()
 
 	fmt.Fprintln(os.Stderr, "fetching repository commits...")
 	tic := time.Now()

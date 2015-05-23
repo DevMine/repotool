@@ -99,8 +99,8 @@ func (gr gitRepo) GetCommits() []model.Commit {
 	return gr.Commits
 }
 
-// CleanUp frees open repositories and removes temporary created files.
-func (gr gitRepo) CleanUp() error {
+// Cleanup frees open repositories and removes temporary created files, if any.
+func (gr gitRepo) Cleanup() error {
 	gr.r.Free()
 	return os.RemoveAll(gr.gitDir)
 }
