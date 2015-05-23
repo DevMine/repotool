@@ -338,6 +338,7 @@ func untarGitFolder(destPath, archivePath string) error {
 					if _, err := io.Copy(f, tr); err != nil {
 						return err
 					}
+					return nil
 				}
 
 				if err = createFile(); err != nil {
