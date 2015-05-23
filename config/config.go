@@ -26,7 +26,11 @@ var sslModes = map[string]bool{
 type Config struct {
 	Database DatabaseConfig `json:"database"`
 	Data     DataConfig     `json:"data"`
-	TmpDir   string         `json:"tmpDir"`
+
+	// TmpDir can be used to specify a temporary working directory. If
+	// left unspecified, the default system temporary directory will be used.
+	// If you have a ramdisk, you are advised to use it here.
+	TmpDir string `json:"tmpDir"`
 }
 
 // DatabaseConfig is a configuration for PostgreSQL database connection
