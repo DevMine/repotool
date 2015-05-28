@@ -123,10 +123,7 @@ func main() {
 	}
 
 	if *jsonflag && (len(*srctoolflag)) > 0 {
-		var bs []byte
 		var r *bufio.Reader
-		buf := new(bytes.Buffer)
-
 		if *srctoolflag == strings.ToLower("stdin") {
 			// read from stdin
 			r = bufio.NewReader(os.Stdin)
@@ -139,11 +136,12 @@ func main() {
 			r = bufio.NewReader(f)
 		}
 
+		buf := new(bytes.Buffer)
 		if _, err = io.Copy(buf, r); err != nil {
 			fatal(err)
 		}
-		bs = buf.Bytes()
 
+		bs := buf.Bytes()
 		p, err := src.Unmarshal(bs)
 		if err != nil {
 			fatal(err)
@@ -173,7 +171,6 @@ func main() {
 		toc := time.Now()
 		fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
 	}
-
 }
 
 // fatal prints an error on standard error stream and exits.
