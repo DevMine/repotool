@@ -171,7 +171,10 @@ As `libgit2` does not support reading information directly from a tar archive,
 when given a git repository as a tar archive, `repotool` will extract part of
 the archive into a temporary location. You can specify where using `tmp_dir`
 in the configuration file. We advise specifying a path to a ramdisk for
-increased performance and reduced main storage I/Os.
+increased performance and reduced main storage I/Os. When using a ramdisk with
+limited capacity, you shall specify the largest size for a tar archive to be
+extracted in `tmp_dir` using the `tmp_dir_file_size_limit` option. Every tar
+archive larger than this size will be extracted in its storage location instead.
 
 If you plan on batch processing multiple repositories, see
 [batch-repotool.go](https://github.com/DevMine/devmine/blob/master/tools/batch-repotool.go).
