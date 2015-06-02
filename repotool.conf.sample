@@ -11,5 +11,6 @@
         "commit_deltas": false,
         "commit_patches": false
     },
-	"tmp_dir": "/ramdisk"
+    "tmp_dir": "/ramdisk",
+    "tmp_dir_file_size_limit": 2.0
 }

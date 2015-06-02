@@ -31,6 +31,11 @@ type Config struct {
 	// left unspecified, the default system temporary directory will be used.
 	// If you have a ramdisk, you are advised to use it here.
 	TmpDir string `json:"tmp_dir"`
+
+	// TmpDirFileSizeLimit can be used to specify the maximum size in GB of an
+	// object to be temporarily placed in TmpDir for processing. Files of size
+	// larger than this value will not be processed in TmpDir.
+	TmpDirFileSizeLimit float64 `json:"tmp_dir_file_size_limit"`
 }
 
 // DatabaseConfig is a configuration for PostgreSQL database connection
@@ -68,6 +73,10 @@ func ReadConfig(path string) (*Config, error) {
 	cfg := new(Config)
 	if err := json.Unmarshal(bs, cfg); err != nil {
 		return nil, err
+	}
+
+	if cfg.TmpDirFileSizeLimit < 0.01 {
+		cfg.TmpDirFileSizeLimit = 0.01
 	}
 
 	if err := cfg.verify(); err != nil {
