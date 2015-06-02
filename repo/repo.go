@@ -76,18 +76,28 @@ func New(cfg config.Config, path string) (Repo, error) {
 
 	switch vcs {
 	case Git:
+		var useTmpDir bool
 		tmpPath := path
 		if strings.HasSuffix(path, ".tar") {
-			tmpPath, err = ioutil.TempDir(cfg.TmpDir, "repotool-git-")
-			if err != nil {
-				return nil, err
+			if fi, err := os.Stat(path); err == nil && (bytesToGigaBytes(fi.Size()) < cfg.TmpDirFileSizeLimit) {
+				tmpPath, err = ioutil.TempDir(cfg.TmpDir, "repotool-git-")
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				tmpPath = strings.TrimSuffix(tmpPath, ".tar")
 			}
 
 			if err = untarGitFolder(tmpPath, path); err != nil {
 				_ = os.RemoveAll(tmpPath)
 				return nil, err
 			}
+
 			path = strings.TrimSuffix(path, ".tar")
+			// since we extracted the archive, we need to remove it afterwards
+			// hence, tell the gitrepo constructor that git directory is a
+			// temporary directory
+			useTmpDir = true
 		}
 		cloneURL, err := extractGitURL(tmpPath)
 		if err != nil {
@@ -106,7 +116,7 @@ func New(cfg config.Config, path string) (Repo, error) {
 			ClonePath:     path,
 			DefaultBranch: *branch,
 		}
-		repo, err = newGitRepo(cfg, repository, tmpPath)
+		repo, err = newGitRepo(cfg, repository, tmpPath, useTmpDir)
 		if err != nil {
 			return nil, err
 		}
@@ -167,4 +177,8 @@ func detectVCS(path string) (string, error) {
 // extractName extracts to name of a repository given its clone URL.
 func extractName(path string) string {
 	return filepath.Base(path)
+}
+
+func bytesToGigaBytes(bytes int64) float64 {
+	return float64(bytes) / 1000000000.0
 }

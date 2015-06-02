@@ -25,18 +25,22 @@ type gitRepo struct {
 	model.Repository
 	cfg    config.DataConfig
 	r      *g2g.Repository
-	gitDir string
+	tmpDir string
 }
 
 // New creates a new gitRepo object.
-func newGitRepo(cfg config.Config, repository model.Repository, gitDir string) (*gitRepo, error) {
+func newGitRepo(cfg config.Config, repository model.Repository, gitDir string, useTmpDir bool) (*gitRepo, error) {
 	r, err := g2g.OpenRepository(gitDir)
-
 	if err != nil {
 		return nil, err
 	}
 
-	return &gitRepo{Repository: repository, cfg: cfg.Data, r: r}, nil
+	var tmpDir string
+	if useTmpDir {
+		tmpDir = gitDir
+	}
+
+	return &gitRepo{Repository: repository, cfg: cfg.Data, r: r, tmpDir: tmpDir}, nil
 }
 
 // FetchCommits fetches all commits from a Git repository and adds them to
@@ -101,8 +105,14 @@ func (gr gitRepo) GetCommits() []model.Commit {
 
 // Cleanup frees open repositories and removes temporary created files, if any.
 func (gr gitRepo) Cleanup() error {
-	gr.r.Free()
-	return os.RemoveAll(gr.gitDir)
+	if gr.r != nil {
+		gr.r.Free()
+	}
+
+	if len(gr.tmpDir) > 0 {
+		return os.RemoveAll(gr.tmpDir)
+	}
+	return nil
 }
 
 var deltaMap = map[g2g.Delta]*string{
