@@ -167,9 +167,14 @@ func main() {
 			"inserting %d commits from %s repository into the database...\n",
 			len(repository.GetCommits()), repository.GetName())
 		tic := time.Now()
-		insertRepoData(db, repository)
+		err = insertRepoData(db, repository)
 		toc := time.Now()
-		fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		} else {
+			fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
+		}
 	}
 }
 
@@ -195,51 +200,92 @@ func openDBSession(cfg config.DatabaseConfig) (*sql.DB, error) {
 
 // insertRepoData inserts repository data into the database, or updates it
 // if it is already there.
-func insertRepoData(db *sql.DB, r repo.Repo) {
+func insertRepoData(db *sql.DB, r repo.Repo) error {
 	if db == nil {
-		fatal(errors.New("nil database given"))
+		return errors.New("nil database given")
 	}
 
-	repoID := getRepoID(db, r)
-	if repoID == 0 {
-		fatal(errors.New("no corresponding repository found in the database: impossible to insert data"))
+	repoID, err := getRepoID(db, r)
+	if err != nil {
+		return err
+	}
+	if repoID == nil {
+		return errors.New("cannot find corresponding repository in database")
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	commitStmt, err := tx.Prepare(genInsQuery("commits", commitFields...) + " RETURNING id")
+	if err != nil {
+		return err
+	}
+
+	deltaStmt, err := tx.Prepare(genInsQuery("commit_diff_deltas", diffDeltaFields...))
+	if err != nil {
+		return err
 	}
 
 	for _, c := range r.GetCommits() {
-		insertCommit(db, repoID, c)
+		if err := insertCommit(*repoID, c, tx, commitStmt, deltaStmt); err != nil {
+			return err
+		}
 	}
+
+	if err := commitStmt.Close(); err != nil {
+		return err
+	}
+	if err := deltaStmt.Close(); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // insertCommit inserts a commit into the database
-func insertCommit(db *sql.DB, repoID int, c model.Commit) {
-	authorID := getUserID(db, c.Author.Email)
-	committerID := getUserID(db, c.Committer.Email)
+func insertCommit(repoID int64, c model.Commit, tx *sql.Tx, commitStmt, deltaStmt *sql.Stmt) error {
+	// TODO load user ids/email in a map once at start
+	authorID, err := getUserID(tx, c.Author.Email)
+	if err != nil {
+		return err
+	}
+	committerID, err := getUserID(tx, c.Committer.Email)
+	if err != nil {
+		return err
+	}
 	hash := genCommitHash(c)
 
 	var commitID int64
-	query := genInsQuery("commits", commitFields...)
-	err := db.QueryRow(query+" RETURNING id",
+	err = commitStmt.QueryRow(
 		repoID, authorID, committerID, hash,
 		c.VCSID, c.Message, c.AuthorDate, c.CommitDate,
 		c.FileChangedCount, c.InsertionsCount, c.DeletionsCount).Scan(&commitID)
 	if err != nil {
-		fail(err)
-		return
+		return err
 	}
 
 	for _, d := range c.DiffDelta {
-		insertDiffDelta(db, commitID, d)
+		if err := insertDiffDelta(commitID, d, deltaStmt); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // insertDiffDelta inserts a commit diff delta into the database.
-func insertDiffDelta(db *sql.DB, commitID int64, d model.DiffDelta) {
-	query := genInsQuery("commit_diff_deltas", diffDeltaFields...)
-	_, err := db.Exec(query,
-		commitID, d.Status, d.Binary, d.Similarity, d.OldFilePath, d.NewFilePath)
+func insertDiffDelta(commitID int64, d model.DiffDelta, stmt *sql.Stmt) error {
+	_, err := stmt.Exec(commitID, d.Status, d.Binary, d.Similarity, d.OldFilePath, d.NewFilePath)
 	if err != nil {
-		fail(err)
+		return err
 	}
+	return nil
 }
 
 // genCommitHash generates a hash (mmh3) from commit fields.
@@ -266,45 +312,45 @@ func genCommitHash(c model.Commit) string {
 
 // getRepoID returns the repository id of a repo in repositories table.
 // If repo is not in the table, then 0 is returned.
-func getRepoID(db *sql.DB, r repo.Repo) int {
+func getRepoID(db *sql.DB, r repo.Repo) (*int64, error) {
 	if db == nil {
-		fatal(errors.New("nil database given"))
+		return nil, errors.New("nil database given")
 	}
 
-	var id int
+	var id *int64
 	// Clone URL is unique
 	err := db.QueryRow("SELECT id FROM repositories WHERE clone_url=$1", r.GetCloneURL()).Scan(&id)
 	switch {
 	case err == sql.ErrNoRows:
-		return 0
+		return nil, nil
 	case err != nil:
-		fatal(err)
+		return nil, err
 	}
-	return id
+	return id, nil
 }
 
 // getUserID attempts to find a user ID given its email address.
 // Email addresses are unique, however they may not be provided.
 // If no user ID is found, nil is returned, otherwhise the user ID
 // is returned.
-func getUserID(db *sql.DB, email string) *int {
-	if db == nil {
-		fatal(errors.New("nil database given"))
+func getUserID(tx *sql.Tx, email string) (*int64, error) {
+	if tx == nil {
+		return nil, errors.New("nil database given")
 	}
 
 	if len(email) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	var id *int
-	err := db.QueryRow("SELECT id FROM users WHERE email=$1", email).Scan(&id)
+	var id *int64
+	err := tx.QueryRow("SELECT id FROM users WHERE email=$1", email).Scan(&id)
 	switch {
 	case err == sql.ErrNoRows:
-		return nil
+		return nil, nil
 	case err != nil:
-		fatal(err)
+		return nil, err
 	}
-	return id
+	return id, nil
 }
 
 // genInsQuery generates a query string for an insertion in the database.
