@@ -62,6 +62,8 @@ var (
 )
 
 func main() {
+	var err error
+
 	flag.Usage = func() {
 		fmt.Printf("usage: %s [OPTION(S)] [REPOSITORY PATH]\n", os.Args[0])
 		flag.PrintDefaults()
@@ -93,31 +95,39 @@ func main() {
 		fatal(errors.New("srctool flag may be used only in conjonction with json flag"))
 	}
 
-	cfg, err := config.ReadConfig(*configPath)
+	var cfg *config.Config
+	cfg, err = config.ReadConfig(*configPath)
 	if err != nil {
 		fatal(err)
 	}
 
 	repoPath := flag.Arg(0)
-	repository, err := repo.New(*cfg, repoPath)
+	var repository repo.Repo
+	repository, err = repo.New(*cfg, repoPath)
 	if err != nil {
 		fatal(err)
 	}
-	defer repository.Cleanup()
+	defer func() {
+		repository.Cleanup()
+		if err != nil {
+			fatal(err)
+		}
+	}()
 
 	fmt.Fprintln(os.Stderr, "fetching repository commits...")
 	tic := time.Now()
 	err = repository.FetchCommits()
 	if err != nil {
-		fatal(err)
+		return
 	}
 	toc := time.Now()
 	fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
 
 	if *jsonflag && (len(*srctoolflag) == 0) {
-		bs, err := json.Marshal(repository)
+		var bs []byte
+		bs, err = json.Marshal(repository)
 		if err != nil {
-			fatal(err)
+			return
 		}
 		fmt.Println(string(bs))
 	}
@@ -131,35 +141,38 @@ func main() {
 			// read from srctool json file
 			var f *os.File
 			if f, err = os.Open(*srctoolflag); err != nil {
-				fatal(err)
+				return
 			}
 			r = bufio.NewReader(f)
 		}
 
 		buf := new(bytes.Buffer)
 		if _, err = io.Copy(buf, r); err != nil {
-			fatal(err)
+			fail(err)
+			return
 		}
 
 		bs := buf.Bytes()
-		p, err := src.Unmarshal(bs)
+		var p *src.Project
+		p, err = src.Unmarshal(bs)
 		if err != nil {
-			fatal(err)
+			return
 		}
 
 		p.Repo = repository.GetRepository()
 		bs, err = src.Marshal(p)
 		if err != nil {
-			fatal(err)
+			return
 		}
 
 		fmt.Println(string(bs))
 	}
 
 	if *dbflag {
-		db, err := openDBSession(cfg.Database)
+		var db *sql.DB
+		db, err = openDBSession(cfg.Database)
 		if err != nil {
-			fatal(err)
+			return
 		}
 		defer db.Close()
 
@@ -170,11 +183,9 @@ func main() {
 		err = insertRepoData(db, repository)
 		toc := time.Now()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		} else {
-			fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
+			return
 		}
+		fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
 	}
 }
 
