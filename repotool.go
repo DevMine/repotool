@@ -213,6 +213,11 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 		return errors.New("cannot find corresponding repository in database")
 	}
 
+	userIDs, err := getAllUsers(db)
+	if err != nil {
+		return err
+	}
+
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -230,7 +235,7 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 	}
 
 	for _, c := range r.GetCommits() {
-		if err := insertCommit(*repoID, c, tx, commitStmt, deltaStmt); err != nil {
+		if err := insertCommit(userIDs, *repoID, c, tx, commitStmt, deltaStmt); err != nil {
 			return err
 		}
 	}
@@ -249,20 +254,13 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 }
 
 // insertCommit inserts a commit into the database
-func insertCommit(repoID int64, c model.Commit, tx *sql.Tx, commitStmt, deltaStmt *sql.Stmt) error {
-	// TODO load user ids/email in a map once at start
-	authorID, err := getUserID(tx, c.Author.Email)
-	if err != nil {
-		return err
-	}
-	committerID, err := getUserID(tx, c.Committer.Email)
-	if err != nil {
-		return err
-	}
+func insertCommit(userIDs map[string]uint64, repoID uint64, c model.Commit, tx *sql.Tx, commitStmt, deltaStmt *sql.Stmt) error {
+	authorID := userIDs[c.Author.Email]
+	committerID := userIDs[c.Committer.Email]
 	hash := genCommitHash(c)
 
-	var commitID int64
-	err = commitStmt.QueryRow(
+	var commitID uint64
+	err := commitStmt.QueryRow(
 		repoID, authorID, committerID, hash,
 		c.VCSID, c.Message, c.AuthorDate, c.CommitDate,
 		c.FileChangedCount, c.InsertionsCount, c.DeletionsCount).Scan(&commitID)
@@ -280,12 +278,33 @@ func insertCommit(repoID int64, c model.Commit, tx *sql.Tx, commitStmt, deltaStm
 }
 
 // insertDiffDelta inserts a commit diff delta into the database.
-func insertDiffDelta(commitID int64, d model.DiffDelta, stmt *sql.Stmt) error {
+func insertDiffDelta(commitID uint64, d model.DiffDelta, stmt *sql.Stmt) error {
 	_, err := stmt.Exec(commitID, d.Status, d.Binary, d.Similarity, d.OldFilePath, d.NewFilePath)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+// getAllUsers returns a map of all users IDs with their email address as keys.
+func getAllUsers(db *sql.DB) (map[string]uint64, error) {
+	rows, err := db.Query("SELECT id, email FROM users WHERE email IS NOT NULL AND email != ''")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	userIDs := map[string]uint64{}
+	for rows.Next() {
+		var email string
+		var id uint64
+		if err := rows.Scan(&id, &email); err != nil {
+			return nil, err
+		}
+		userIDs[email] = id
+	}
+
+	return userIDs, nil
 }
 
 // genCommitHash generates a hash (mmh3) from commit fields.
@@ -312,38 +331,14 @@ func genCommitHash(c model.Commit) string {
 
 // getRepoID returns the repository id of a repo in repositories table.
 // If repo is not in the table, then 0 is returned.
-func getRepoID(db *sql.DB, r repo.Repo) (*int64, error) {
+func getRepoID(db *sql.DB, r repo.Repo) (*uint64, error) {
 	if db == nil {
 		return nil, errors.New("nil database given")
 	}
 
-	var id *int64
+	var id *uint64
 	// Clone URL is unique
 	err := db.QueryRow("SELECT id FROM repositories WHERE clone_url=$1", r.GetCloneURL()).Scan(&id)
-	switch {
-	case err == sql.ErrNoRows:
-		return nil, nil
-	case err != nil:
-		return nil, err
-	}
-	return id, nil
-}
-
-// getUserID attempts to find a user ID given its email address.
-// Email addresses are unique, however they may not be provided.
-// If no user ID is found, nil is returned, otherwhise the user ID
-// is returned.
-func getUserID(tx *sql.Tx, email string) (*int64, error) {
-	if tx == nil {
-		return nil, errors.New("nil database given")
-	}
-
-	if len(email) == 0 {
-		return nil, nil
-	}
-
-	var id *int64
-	err := tx.QueryRow("SELECT id FROM users WHERE email=$1", email).Scan(&id)
 	switch {
 	case err == sql.ErrNoRows:
 		return nil, nil
