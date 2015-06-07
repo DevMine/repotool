@@ -147,40 +147,45 @@ Or you can download a binary for your platform from the DevMine project's
 `repotool` produces JSON, provided that you feed it with a path to a source code
 repository managed by a VCS which can be either in the form of a directory or a
 tar archive. By default, informative messages are outputted to `stderr` whereas
-JSON is outputted to `stdout`. Example usage:
+JSON is outputted to `stdout`. To see the list of available options, use the
+`-h` flag. Example usage:
 
     repotool ~/Code/myawesomeproject > myawesomeproject.json
 
-To insert data into the PostgreSQL database, you need to provide a configuration
-file in argument. Simply copy `repotool.conf.sample` to `repotool.conf` and
-adjust database connection information. See this
+`repotool-db` can be used to insert data into the PostgreSQL database.
+You need to provide a configuration file in argument. Simply copy
+`repotool.conf.sample` to `repotool.conf` and adjust database connection
+information at the very least. See this
 [README.md](https://github.com/DevMine/repotool/blob/master/db/README.md) for
-more information about the database schema. Example usage:
+more information about the database schema.
+`repotool-db` can be used to process multiple repositories in parallel. This is
+why, as opposed to `repotool`, it does not simply take a repository as argument
+but it takes a directory where it expects to find source code repositories. The
+depth at which repositories are expected to be found can be specified with the
+`depth` flag. To see the list of available options, use the `-h` flag. Example
+usage:
 
-    repotool -json=false -db -c repotool.conf ~/Code/myawesomeproject
+    repotool-db -c repotool.conf ~/Code
 
-With the configuration file, you can also tell `repotool` to output commit
+With the configuration file, you can also tell `repotool-db` to insert commit
 deltas and commits patches (the latter works only if you enable commit deltas,
-quite logically). Simply set the `commit_deltas` and, eventually,
-`commit_patches`, to `true`. Be careful with the `commit_patches` option as this
-may rapidly produce a lot of data. Also note that if you plan on inserting data
-into a database, patches are not going to be inserted, whether you set
-`commit_patches` to `true` or not.
+quite logically). Simply set the `commit_deltas` and to `true`. Note that the
+`commit_patches` option is ignored for now. `repotool-db` can process
+repositories concurrently by recursively traversing directories, spawning
+goroutines in the process.  When using it, bear in mind that `repotool-db` is IO
+and CPU intensive, hence do not spawn too many goroutines or you might reach the
+number of open files limit. The number of goroutines can be adjusted with the
+`-g` parameter.  Using about the same number of goroutines as the number of cpu
+cores should be a reasonable choice.
 
 As `libgit2` does not support reading information directly from a tar archive,
-when given a git repository as a tar archive, `repotool` will extract part of
-the archive into a temporary location. You can specify where using `tmp_dir`
-in the configuration file. We advise specifying a path to a ramdisk for
-increased performance and reduced main storage I/Os. When using a ramdisk with
-limited capacity, you shall specify the largest size for a tar archive to be
-extracted in `tmp_dir` using the `tmp_dir_file_size_limit` option. Every tar
-archive larger than this size will be extracted in its storage location instead.
-
-If you plan on batch processing multiple repositories, see
-[batch-repotool.go](https://github.com/DevMine/devmine/blob/master/tools/batch-repotool.go).
-It can process repositories concurrently by recursively traversing directories
-and calling `repotool`, spawning goroutines in the process.  When using it, bear
-in mind that `repotool` is IO and CPU intensive, hence do not spawn too many
-goroutines or you might reach the number of open files limit. The number of
-goroutines can be adjusted with the `-g` parameter.  Using about the same number
-of goroutines as the number of cpu cores should be a reasonable choice.
+when given a git repository as a tar archive, `repotool`, or `repotool-db` will
+extract part of the archive into a temporary location. You can specify where
+using `tmp_dir` in the configuration file for `repotool-db` or by given the
+information as argument to `repotool`. We advise specifying a path to a ramdisk
+for increased performance and reduced main storage I/Os. When using a ramdisk
+with limited capacity, you shall specify the largest size for a tar archive to
+be extracted in `tmp_dir` using the `tmp_dir_file_size_limit` option from the
+configuration file for `repotool-db` or by using the appropriate flag for
+`repotool`. Every tar archive larger than this size will be extracted in its
+storage location instead.
