@@ -2,34 +2,32 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package repotool is able to fetch information from a source code repository.
+// Package repotool-db is able to fetch information from a source code repository.
 // Typically, it can get all commits, their authors and commiters and so on
-// and return this information in a JSON object. Alternatively, it is able
-// to populate the information into a PostgreSQL database.
+// and is able to populate the information into a PostgreSQL database.
 // Currently, on the Git VCS is supported.
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
-	"time"
+	"sync"
 
+	"github.com/golang/glog"
 	_ "github.com/lib/pq"
 	mmh3 "github.com/spaolacci/murmur3"
-
-	"github.com/DevMine/srcanlzr/src"
 
 	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
@@ -64,19 +62,18 @@ var (
 
 // program flags
 var (
-	configPath  = flag.String("c", "", "configuration file")
-	vflag       = flag.Bool("v", false, "print version.")
-	jsonflag    = flag.Bool("json", true, "json output")
-	dbflag      = flag.Bool("db", false, "import data into the database")
-	srctoolflag = flag.String("srctool", "", "read json file produced by srctool (give stdin to read from stdin)")
-	cpuprofile  = flag.String("cpuprofile", "", "write cpu profile to file")
+	configPath    = flag.String("c", "", "configuration file")
+	vflag         = flag.Bool("V", false, "print version.")
+	cpuprofile    = flag.String("cpuprofile", "", "write cpu profile to file")
+	depthflag     = flag.Uint("d", 0, "depth level where to find repositories")
+	numGoroutines = flag.Uint("g", uint(runtime.NumCPU()), "max number of goroutines to spawn")
 )
 
 func main() {
 	var err error
 
 	flag.Usage = func() {
-		fmt.Printf("usage: %s [OPTION(S)] [REPOSITORY PATH]\n", os.Args[0])
+		fmt.Printf("usage: %s [OPTION(S)] [REPOSITORIES ROOT FOLDER]\n", os.Args[0])
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
@@ -101,12 +98,8 @@ func main() {
 		flag.Usage()
 	}
 
-	if *dbflag && len(*configPath) == 0 {
-		fatal(errors.New("a configuration file must be specified when using db option"))
-	}
-
-	if !*jsonflag && (len(*srctoolflag) > 0) {
-		fatal(errors.New("srctool flag may be used only in conjonction with json flag"))
+	if len(*configPath) == 0 {
+		fatal(errors.New("a configuration file must be specified"))
 	}
 
 	var cfg *config.Config
@@ -115,91 +108,81 @@ func main() {
 		fatal(err)
 	}
 
-	repoPath := flag.Arg(0)
-	var repository repo.Repo
-	repository, err = repo.New(*cfg, repoPath)
-	if err != nil {
-		fatal(err)
-	}
-	defer func() {
-		repository.Cleanup()
-		if err != nil {
-			fatal(err)
-		}
-	}()
+	// Make sure we finish writing logs before exiting.
+	defer glog.Flush()
 
-	fmt.Fprintln(os.Stderr, "fetching repository commits...")
-	tic := time.Now()
-	err = repository.FetchCommits()
+	var db *sql.DB
+	db, err = openDBSession(*cfg.Database)
 	if err != nil {
 		return
 	}
-	toc := time.Now()
-	fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
+	defer db.Close()
 
-	if *jsonflag && (len(*srctoolflag) == 0) {
-		var bs []byte
-		bs, err = json.Marshal(repository)
-		if err != nil {
-			return
-		}
-		fmt.Println(string(bs))
-	}
+	reposPath := make(chan string, 0)
+	var wg sync.WaitGroup
+	for w := uint(0); w < *numGoroutines; w++ {
+		wg.Add(1)
+		go func() {
+			for path := range reposPath {
+				work := func() error {
+					repository, err := repo.New(*cfg, path)
+					if err != nil {
+						return err
+					}
+					defer repository.Cleanup()
 
-	if *jsonflag && (len(*srctoolflag)) > 0 {
-		var r *bufio.Reader
-		if *srctoolflag == strings.ToLower("stdin") {
-			// read from stdin
-			r = bufio.NewReader(os.Stdin)
-		} else {
-			// read from srctool json file
-			var f *os.File
-			if f, err = os.Open(*srctoolflag); err != nil {
-				return
+					if err = repository.FetchCommits(); err != nil {
+						return err
+					}
+
+					if err = insertRepoData(db, repository); err != nil {
+						return err
+					}
+					return nil
+				}
+				if err := work(); err != nil {
+					glog.Error(err)
+				}
 			}
-			r = bufio.NewReader(f)
-		}
-
-		buf := new(bytes.Buffer)
-		if _, err = io.Copy(buf, r); err != nil {
-			fail(err)
-			return
-		}
-
-		bs := buf.Bytes()
-		var p *src.Project
-		p, err = src.Unmarshal(bs)
-		if err != nil {
-			return
-		}
-
-		p.Repo = repository.GetRepository()
-		bs, err = src.Marshal(p)
-		if err != nil {
-			return
-		}
-
-		fmt.Println(string(bs))
+			wg.Done()
+		}()
 	}
 
-	if *dbflag {
-		var db *sql.DB
-		db, err = openDBSession(cfg.Database)
-		if err != nil {
-			return
-		}
-		defer db.Close()
+	reposDir := flag.Arg(0)
+	iterateRepos(reposPath, reposDir, *depthflag)
 
-		fmt.Fprintf(os.Stderr,
-			"inserting %d commits from %s repository into the database...\n",
-			len(repository.GetCommits()), repository.GetName())
-		tic := time.Now()
-		err = insertRepoData(db, repository)
-		toc := time.Now()
-		if err != nil {
-			return
+	close(reposPath)
+	wg.Wait()
+
+}
+
+func iterateRepos(reposPath chan string, path string, depth uint) {
+	fis, err := ioutil.ReadDir(path)
+	if err != nil {
+		fatal(err)
+	}
+
+	if depth == 0 {
+		for _, fi := range fis {
+			if !fi.IsDir() {
+				if filepath.Ext(fi.Name()) != ".tar" {
+					continue
+				}
+			}
+
+			repoPath := filepath.Join(path, fi.Name())
+			fmt.Println("adding repository: ", repoPath, " to the tasks pool")
+			reposPath <- repoPath
 		}
-		fmt.Fprintln(os.Stderr, "done in ", toc.Sub(tic))
+		return
+	}
+
+	for _, fi := range fis {
+		if !fi.IsDir() {
+			continue
+		}
+
+		iterateRepos(reposPath, filepath.Join(path, fi.Name()), depth-1)
 	}
 }
 
@@ -207,11 +190,6 @@ func main() {
 func fatal(a ...interface{}) {
 	fmt.Fprintln(os.Stderr, a...)
 	os.Exit(1)
-}
-
-// fail prints an error on standard error stream.
-func fail(a ...interface{}) {
-	fmt.Fprintln(os.Stderr, a...)
 }
 
 // openDBSession creates a session to the database.
