@@ -56,7 +56,6 @@ CREATE TABLE commits (
     repository_id bigint NOT NULL,
     author_id bigint,
     committer_id bigint,
-    hash character varying NOT NULL,
     vcs_id character varying NOT NULL,
     message text,
     author_date timestamp with time zone,
@@ -114,14 +113,6 @@ ALTER TABLE ONLY commit_diff_deltas
 
 ALTER TABLE ONLY commits
     ADD CONSTRAINT commits_pk PRIMARY KEY (id);
-
-
---
--- Name: commits_unique_hash_and_vcs_id; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY commits
-    ADD CONSTRAINT commits_unique_hash_and_vcs_id UNIQUE (hash, vcs_id);
 
 
 --

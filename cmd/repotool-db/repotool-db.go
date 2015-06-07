@@ -11,23 +11,19 @@ package main
 import (
 	"bytes"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/golang/glog"
 	_ "github.com/lib/pq"
-	mmh3 "github.com/spaolacci/murmur3"
 
 	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
@@ -50,7 +46,6 @@ var (
 		"repository_id",
 		"author_id",
 		"committer_id",
-		"hash",
 		"vcs_id",
 		"message",
 		"author_date",
@@ -129,6 +124,14 @@ func main() {
 			glog.Fatal(err)
 		}
 	}()
+
+	var empty bool
+	if empty, err = isTableEmpty(db, "commits"); !empty || (err != nil) {
+		if err == nil {
+			err = errors.New("commits table is not empty")
+		}
+		return
+	}
 
 	if err = fetchAllUsers(db); err != nil {
 		return
@@ -265,11 +268,10 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 func insertCommit(repoID uint64, c model.Commit, tx *sql.Tx, commitStmt, deltaStmt *sql.Stmt) error {
 	authorID := userIDs[c.Author.Email]
 	committerID := userIDs[c.Committer.Email]
-	hash := genCommitHash(c)
 
 	var commitID uint64
 	err := commitStmt.QueryRow(
-		repoID, authorID, committerID, hash,
+		repoID, authorID, committerID,
 		c.VCSID, c.Message, c.AuthorDate, c.CommitDate,
 		c.FileChangedCount, c.InsertionsCount, c.DeletionsCount).Scan(&commitID)
 	if err != nil {
@@ -334,28 +336,6 @@ func fetchAllRepos(db *sql.DB) error {
 	return nil
 }
 
-// genCommitHash generates a hash (mmh3) from commit fields.
-// This hash can then be used to uniquely identify a commit.
-// Typically, we want to make sure not to insert twice the same commit into the
-// database after an eventual second repotool run on the same repository.
-func genCommitHash(c model.Commit) string {
-	h := mmh3.New128()
-
-	io.WriteString(h, c.VCSID)
-	io.WriteString(h, c.Message)
-	io.WriteString(h, c.Author.Name)
-	io.WriteString(h, c.Author.Email)
-	io.WriteString(h, c.Committer.Name)
-	io.WriteString(h, c.Committer.Email)
-	io.WriteString(h, c.AuthorDate.String())
-	io.WriteString(h, c.CommitDate.String())
-	io.WriteString(h, strconv.FormatInt(int64(c.FileChangedCount), 10))
-	io.WriteString(h, strconv.FormatInt(int64(c.InsertionsCount), 10))
-	io.WriteString(h, strconv.FormatInt(int64(c.DeletionsCount), 10))
-
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 // genInsQuery generates a query string for an insertion in the database.
 func genInsQuery(tableName string, fields ...string) string {
 	var buf bytes.Buffer
@@ -375,4 +355,11 @@ func genInsQuery(tableName string, fields ...string) string {
 	buf.WriteString(")\n")
 
 	return buf.String()
+}
+
+// isTableEmpty returns true of the table tableName is empty, false otherwise.
+func isTableEmpty(db *sql.DB, tableName string) (bool, error) {
+	var state bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM " + tableName + " LIMIT 1)").Scan(&state)
+	return !state, err
 }
