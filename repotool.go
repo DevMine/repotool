@@ -61,6 +61,15 @@ var (
 		"deletions_count"}
 )
 
+// program flags
+var (
+	configPath  = flag.String("c", "", "configuration file")
+	vflag       = flag.Bool("v", false, "print version.")
+	jsonflag    = flag.Bool("json", true, "json output")
+	dbflag      = flag.Bool("db", false, "import data into the database")
+	srctoolflag = flag.String("srctool", "", "read json file produced by srctool (give stdin to read from stdin)")
+)
+
 func main() {
 	var err error
 
@@ -69,12 +78,6 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
-
-	configPath := flag.String("c", "", "configuration file")
-	vflag := flag.Bool("v", false, "print version.")
-	jsonflag := flag.Bool("json", true, "json output")
-	dbflag := flag.Bool("db", false, "import data into the database")
-	srctoolflag := flag.String("srctool", "", "read json file produced by srctool (give stdin to read from stdin)")
 	flag.Parse()
 
 	if *vflag {
