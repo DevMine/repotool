@@ -24,8 +24,8 @@ var sslModes = map[string]bool{
 
 // Config is the main configuration structure.
 type Config struct {
-	Database DatabaseConfig `json:"database"`
-	Data     DataConfig     `json:"data"`
+	Database *DatabaseConfig `json:"database"`
+	Data     DataConfig      `json:"data"`
 
 	// TmpDir can be used to specify a temporary working directory. If
 	// left unspecified, the default system temporary directory will be used.
