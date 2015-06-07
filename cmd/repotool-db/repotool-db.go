@@ -69,6 +69,12 @@ var (
 	numGoroutines = flag.Uint("g", uint(runtime.NumCPU()), "max number of goroutines to spawn")
 )
 
+// globals
+var (
+	userIDs = map[string]uint64{}
+	repoIDs = map[string]uint64{}
+)
+
 func main() {
 	var err error
 
@@ -85,9 +91,10 @@ func main() {
 	}
 
 	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
+		var f *os.File
+		f, err = os.Create(*cpuprofile)
 		if err != nil {
-			fatal(err)
+			glog.Fatal(err)
 		}
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
@@ -99,13 +106,13 @@ func main() {
 	}
 
 	if len(*configPath) == 0 {
-		fatal(errors.New("a configuration file must be specified"))
+		glog.Fatal(errors.New("a configuration file must be specified"))
 	}
 
 	var cfg *config.Config
 	cfg, err = config.ReadConfig(*configPath)
 	if err != nil {
-		fatal(err)
+		glog.Fatal(err)
 	}
 
 	// Make sure we finish writing logs before exiting.
@@ -116,7 +123,19 @@ func main() {
 	if err != nil {
 		return
 	}
-	defer db.Close()
+	defer func() {
+		db.Close()
+		if err != nil {
+			glog.Fatal(err)
+		}
+	}()
+
+	if err = fetchAllUsers(db); err != nil {
+		return
+	}
+	if err = fetchAllRepos(db); err != nil {
+		return
+	}
 
 	reposPath := make(chan string, 0)
 	var wg sync.WaitGroup
@@ -159,7 +178,7 @@ func main() {
 func iterateRepos(reposPath chan string, path string, depth uint) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
-		fatal(err)
+		glog.Fatal(err)
 	}
 
 	if depth == 0 {
@@ -171,7 +190,7 @@ func iterateRepos(reposPath chan string, path string, depth uint) {
 			}
 
 			repoPath := filepath.Join(path, fi.Name())
-			fmt.Println("adding repository: ", repoPath, " to the tasks pool")
+			fmt.Println("adding repository:", repoPath, "to the pool")
 			reposPath <- repoPath
 		}
 		return
@@ -184,12 +203,6 @@ func iterateRepos(reposPath chan string, path string, depth uint) {
 
 		iterateRepos(reposPath, filepath.Join(path, fi.Name()), depth-1)
 	}
-}
-
-// fatal prints an error on standard error stream and exits.
-func fatal(a ...interface{}) {
-	fmt.Fprintln(os.Stderr, a...)
-	os.Exit(1)
 }
 
 // openDBSession creates a session to the database.
@@ -208,17 +221,9 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 		return errors.New("nil database given")
 	}
 
-	repoID, err := getRepoID(db, r)
-	if err != nil {
-		return err
-	}
-	if repoID == nil {
+	repoID, ok := repoIDs[r.GetCloneURL()]
+	if !ok {
 		return errors.New("cannot find corresponding repository in database")
-	}
-
-	userIDs, err := getAllUsers(db)
-	if err != nil {
-		return err
 	}
 
 	tx, err := db.Begin()
@@ -238,7 +243,7 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 	}
 
 	for _, c := range r.GetCommits() {
-		if err := insertCommit(userIDs, *repoID, c, tx, commitStmt, deltaStmt); err != nil {
+		if err := insertCommit(repoID, c, tx, commitStmt, deltaStmt); err != nil {
 			return err
 		}
 	}
@@ -257,7 +262,7 @@ func insertRepoData(db *sql.DB, r repo.Repo) error {
 }
 
 // insertCommit inserts a commit into the database
-func insertCommit(userIDs map[string]uint64, repoID uint64, c model.Commit, tx *sql.Tx, commitStmt, deltaStmt *sql.Stmt) error {
+func insertCommit(repoID uint64, c model.Commit, tx *sql.Tx, commitStmt, deltaStmt *sql.Stmt) error {
 	authorID := userIDs[c.Author.Email]
 	committerID := userIDs[c.Committer.Email]
 	hash := genCommitHash(c)
@@ -289,25 +294,44 @@ func insertDiffDelta(commitID uint64, d model.DiffDelta, stmt *sql.Stmt) error {
 	return nil
 }
 
-// getAllUsers returns a map of all users IDs with their email address as keys.
-func getAllUsers(db *sql.DB) (map[string]uint64, error) {
+// fetchAllUsers fetch users IDs and put them into the userIDs global hashmap
+// with their email address as keys.
+func fetchAllUsers(db *sql.DB) error {
 	rows, err := db.Query("SELECT id, email FROM users WHERE email IS NOT NULL AND email != ''")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
-	userIDs := map[string]uint64{}
 	for rows.Next() {
 		var email string
 		var id uint64
 		if err := rows.Scan(&id, &email); err != nil {
-			return nil, err
+			return err
 		}
 		userIDs[email] = id
 	}
 
-	return userIDs, nil
+	return nil
+}
+
+func fetchAllRepos(db *sql.DB) error {
+	rows, err := db.Query("SELECT id, clone_url FROM repositories")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id uint64
+		var cloneURL string
+		if err := rows.Scan(&id, &cloneURL); err != nil {
+			return err
+		}
+		repoIDs[cloneURL] = id
+	}
+
+	return nil
 }
 
 // genCommitHash generates a hash (mmh3) from commit fields.
@@ -330,25 +354,6 @@ func genCommitHash(c model.Commit) string {
 	io.WriteString(h, strconv.FormatInt(int64(c.DeletionsCount), 10))
 
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-// getRepoID returns the repository id of a repo in repositories table.
-// If repo is not in the table, then 0 is returned.
-func getRepoID(db *sql.DB, r repo.Repo) (*uint64, error) {
-	if db == nil {
-		return nil, errors.New("nil database given")
-	}
-
-	var id *uint64
-	// Clone URL is unique
-	err := db.QueryRow("SELECT id FROM repositories WHERE clone_url=$1", r.GetCloneURL()).Scan(&id)
-	switch {
-	case err == sql.ErrNoRows:
-		return nil, nil
-	case err != nil:
-		return nil, err
-	}
-	return id, nil
 }
 
 // genInsQuery generates a query string for an insertion in the database.
