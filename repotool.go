@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -68,6 +69,7 @@ var (
 	jsonflag    = flag.Bool("json", true, "json output")
 	dbflag      = flag.Bool("db", false, "import data into the database")
 	srctoolflag = flag.String("srctool", "", "read json file produced by srctool (give stdin to read from stdin)")
+	cpuprofile  = flag.String("cpuprofile", "", "write cpu profile to file")
 )
 
 func main() {
@@ -83,6 +85,15 @@ func main() {
 	if *vflag {
 		fmt.Printf("%s - %s\n", filepath.Base(os.Args[0]), version)
 		os.Exit(0)
+	}
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	if len(flag.Args()) != 1 {
