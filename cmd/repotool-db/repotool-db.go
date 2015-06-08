@@ -193,7 +193,7 @@ func iterateRepos(reposPath chan string, path string, depth uint) {
 			}
 
 			repoPath := filepath.Join(path, fi.Name())
-			fmt.Println("adding repository:", repoPath, "to the pool")
+			glog.Info("adding repository:", repoPath, "to the pool")
 			reposPath <- repoPath
 		}
 		return
