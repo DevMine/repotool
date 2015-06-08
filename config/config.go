@@ -49,6 +49,11 @@ type DatabaseConfig struct {
 
 	// Can take values: disable, require, verify-ca or verify-full
 	SSLMode string `json:"ssl_mode"`
+
+	// CommitsPerTransaction is useful to set how many commits to insert into
+	// the database per transaction. Note that this option is only useful if
+	// commit deltas are NOT inserted as well. Defaults to 1000000.
+	CommitsPerTransaction uint `json:"commits_per_transaction"`
 }
 
 // DataConfig is used to specify some data to retrieve or not.
@@ -77,6 +82,10 @@ func ReadConfig(path string) (*Config, error) {
 
 	if cfg.TmpDirFileSizeLimit < 0.01 {
 		cfg.TmpDirFileSizeLimit = 0.01
+	}
+
+	if cfg.Database.CommitsPerTransaction == 0 {
+		cfg.Database.CommitsPerTransaction = 1000000
 	}
 
 	if err := cfg.verify(); err != nil {
@@ -120,6 +129,10 @@ func (dc DatabaseConfig) verify() error {
 
 	if _, ok := sslModes[dc.SSLMode]; !ok {
 		return errors.New("database can only be disable, require, verify-ca or verify-full")
+	}
+
+	if dc.CommitsPerTransaction == 0 {
+		return errors.New("commits per transaction must be positive")
 	}
 
 	return nil

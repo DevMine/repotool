@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 
 	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
@@ -66,9 +66,17 @@ var (
 
 // globals
 var (
-	userIDs = map[string]uint64{}
-	repoIDs = map[string]uint64{}
+	commitsCount uint
+	userIDs      = map[string]uint64{}
+	repoIDs      = map[string]uint64{}
 )
+
+type commit struct {
+	repoID     uint64
+	authorID   uint64
+	commiterID uint64
+	model.Commit
+}
 
 func main() {
 	var err error
@@ -109,6 +117,7 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	commitsCount = cfg.Database.CommitsPerTransaction
 
 	// Make sure we finish writing logs before exiting.
 	defer glog.Flush()
@@ -140,45 +149,42 @@ func main() {
 		return
 	}
 
-	reposPath := make(chan string, 0)
+	var w sync.WaitGroup
+	var commitsChan chan commit
+	if !cfg.Data.CommitDeltas {
+		w.Add(1)
+		*numGoroutines--
+		// we can use pq.CopyIn() to improve db imports
+		commitsChan = make(chan commit, commitsCount)
+		go func() {
+			dbCopyRoutine(db, commitsChan)
+			w.Done()
+		}()
+	}
+
+	reposPathChan := make(chan string)
 	var wg sync.WaitGroup
 	for w := uint(0); w < *numGoroutines; w++ {
 		wg.Add(1)
 		go func() {
-			for path := range reposPath {
-				work := func() error {
-					repository, err := repo.New(*cfg, path)
-					if err != nil {
-						return err
-					}
-					defer repository.Cleanup()
-
-					if err = repository.FetchCommits(); err != nil {
-						return err
-					}
-
-					if err = insertRepoData(db, repository); err != nil {
-						return err
-					}
-					return nil
-				}
-				if err := work(); err != nil {
-					glog.Error(err)
-				}
-			}
+			repoRoutine(db, *cfg, commitsChan, reposPathChan)
 			wg.Done()
 		}()
 	}
 
 	reposDir := flag.Arg(0)
-	iterateRepos(reposPath, reposDir, *depthflag)
+	iterateRepos(reposPathChan, reposDir, *depthflag)
 
-	close(reposPath)
+	close(reposPathChan)
 	wg.Wait()
 
+	if !cfg.Data.CommitDeltas {
+		close(commitsChan)
+		w.Wait()
+	}
 }
 
-func iterateRepos(reposPath chan string, path string, depth uint) {
+func iterateRepos(reposPathChan chan string, path string, depth uint) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
 		glog.Fatal(err)
@@ -194,7 +200,7 @@ func iterateRepos(reposPath chan string, path string, depth uint) {
 
 			repoPath := filepath.Join(path, fi.Name())
 			glog.Info("adding repository:", repoPath, "to the pool")
-			reposPath <- repoPath
+			reposPathChan <- repoPath
 		}
 		return
 	}
@@ -204,7 +210,134 @@ func iterateRepos(reposPath chan string, path string, depth uint) {
 			continue
 		}
 
-		iterateRepos(reposPath, filepath.Join(path, fi.Name()), depth-1)
+		iterateRepos(reposPathChan, filepath.Join(path, fi.Name()), depth-1)
+	}
+}
+
+func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
+	var err error
+	defer func() {
+		if err != nil {
+			glog.Error(err)
+		}
+	}()
+
+	initTx := func() (*sql.Tx, *sql.Stmt, error) {
+		tx, err := db.Begin()
+		if err != nil {
+			return nil, nil, err
+		}
+		stmt, err := tx.Prepare(pq.CopyIn("commits", commitFields...))
+		if err != nil {
+			return nil, nil, err
+		}
+		return tx, stmt, nil
+	}
+
+	commitTx := func(tx *sql.Tx, stmt *sql.Stmt) error {
+		defer tx.Rollback()
+		if err := stmt.Close(); err != nil {
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	dbExec := func(query string) {
+		if err == nil {
+			_, err = db.Exec(query)
+		}
+	}
+	// disable constraints and indexes
+	dbExec("ALTER TABLE ONLY commit_diff_deltas DROP CONSTRAINT commit_diff_deltas_fk_commits")
+	dbExec("ALTER TABLE ONLY commits DROP CONSTRAINT commits_pk")
+	dbExec("ALTER TABLE ONLY commits DROP CONSTRAINT commits_fk_repositories")
+	dbExec("DROP INDEX fki_commit_diff_deltas_fk_commits")
+	dbExec("DROP INDEX fki_commits_fk_repositories")
+	defer func() {
+		dbExec("ALTER TABLE ONLY commits ADD CONSTRAINT commits_pk PRIMARY KEY (id)")
+		dbExec("ALTER TABLE ONLY commit_diff_deltas ADD CONSTRAINT commit_diff_deltas_fk_commits FOREIGN KEY (commit_id) REFERENCES commits(id)")
+		dbExec("ALTER TABLE ONLY commits ADD CONSTRAINT commits_fk_repositories FOREIGN KEY (repository_id) REFERENCES repositories(id)")
+		dbExec("CREATE INDEX fki_commit_diff_deltas_fk_commits ON commit_diff_deltas USING btree (commit_id)")
+		dbExec("CREATE INDEX fki_commits_fk_repositories ON commits USING btree (repository_id)")
+	}()
+
+	var tx *sql.Tx
+	var stmt *sql.Stmt
+	tx, stmt, err = initTx()
+	if err != nil {
+		return
+	}
+
+	var i uint
+	for c := range commitsChan {
+		_, err = stmt.Exec(
+			c.repoID,
+			c.authorID,
+			c.commiterID,
+			c.VCSID,
+			c.Message,
+			c.AuthorDate,
+			c.CommitDate,
+			c.FileChangedCount,
+			c.InsertionsCount,
+			c.DeletionsCount)
+		if err != nil {
+			continue
+		}
+
+		i++
+
+		if i == commitsCount {
+			if err = commitTx(tx, stmt); err != nil {
+				return
+			}
+
+			i = 0
+			if tx, stmt, err = initTx(); err != nil {
+				return
+			}
+		}
+	}
+
+	if i > 0 {
+		err = commitTx(tx, stmt)
+	}
+}
+func repoRoutine(db *sql.DB, cfg config.Config, commitsChan chan commit, reposPathChan chan string) {
+	for path := range reposPathChan {
+		work := func() error {
+			repository, err := repo.New(cfg, path)
+			if err != nil {
+				return err
+			}
+			defer repository.Cleanup()
+
+			if err = repository.FetchCommits(); err != nil {
+				return err
+			}
+
+			if cfg.Data.CommitDeltas {
+				if err = insertRepoData(db, repository); err != nil {
+					return err
+				}
+			} else {
+				repoID, ok := repoIDs[repository.GetCloneURL()]
+				if !ok {
+					return errors.New("cannot find corresponding repository in database")
+				}
+				for _, c := range repository.GetCommits() {
+					commitsChan <- commit{repoID, userIDs[c.Author.Email], userIDs[c.Committer.Email], c}
+				}
+			}
+			return nil
+		}
+		if err := work(); err != nil {
+			glog.Error(err)
+		}
 	}
 }
 

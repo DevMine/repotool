@@ -5,7 +5,8 @@
         "username": "devmine",
         "password": "devmine",
         "dbname": "devmine",
-        "ssl_mode": "disable"
+        "ssl_mode": "disable",
+        "commits_per_transaction": 1000000
     },
     "data": {
         "commit_deltas": false,

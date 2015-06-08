@@ -170,12 +170,13 @@ usage:
 With the configuration file, you can also tell `repotool-db` to insert commit
 deltas and commits patches (the latter works only if you enable commit deltas,
 quite logically). Simply set the `commit_deltas` and to `true`. Note that the
-`commit_patches` option is ignored for now. `repotool-db` can process
+`commit_patches` option is ignored for now. However, you should know that
+inserting `commit_patches` slow things down a lot. `repotool-db` can process
 repositories concurrently by recursively traversing directories, spawning
-goroutines in the process.  When using it, bear in mind that `repotool-db` is IO
+goroutines in the process. When using it, bear in mind that `repotool-db` is IO
 and CPU intensive, hence do not spawn too many goroutines or you might reach the
 number of open files limit. The number of goroutines can be adjusted with the
-`-g` parameter.  Using about the same number of goroutines as the number of cpu
+`-g` parameter. Using about the same number of goroutines as the number of cpu
 cores should be a reasonable choice.
 
 As `libgit2` does not support reading information directly from a tar archive,
