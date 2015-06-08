@@ -66,7 +66,7 @@ type Repo interface {
 var _ Repo = (*gitRepo)(nil)
 
 // New creates a new Repo object.
-func New(cfg config.Config, path string) (Repo, error) {
+func New(cfg config.DataConfig, path string) (Repo, error) {
 	var repo Repo
 
 	vcs, err := detectVCS(path)

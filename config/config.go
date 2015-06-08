@@ -26,16 +26,6 @@ var sslModes = map[string]bool{
 type Config struct {
 	Database *DatabaseConfig `json:"database"`
 	Data     DataConfig      `json:"data"`
-
-	// TmpDir can be used to specify a temporary working directory. If
-	// left unspecified, the default system temporary directory will be used.
-	// If you have a ramdisk, you are advised to use it here.
-	TmpDir string `json:"tmp_dir"`
-
-	// TmpDirFileSizeLimit can be used to specify the maximum size in GB of an
-	// object to be temporarily placed in TmpDir for processing. Files of size
-	// larger than this value will not be processed in TmpDir.
-	TmpDirFileSizeLimit float64 `json:"tmp_dir_file_size_limit"`
 }
 
 // DatabaseConfig is a configuration for PostgreSQL database connection
@@ -58,6 +48,16 @@ type DatabaseConfig struct {
 
 // DataConfig is used to specify some data to retrieve or not.
 type DataConfig struct {
+	// TmpDir can be used to specify a temporary working directory. If
+	// left unspecified, the default system temporary directory will be used.
+	// If you have a ramdisk, you are advised to use it here.
+	TmpDir string `json:"tmp_dir"`
+
+	// TmpDirFileSizeLimit can be used to specify the maximum size in GB of an
+	// object to be temporarily placed in TmpDir for processing. Files of size
+	// larger than this value will not be processed in TmpDir.
+	TmpDirFileSizeLimit float64 `json:"tmp_dir_file_size_limit"`
+
 	CommitDeltas  bool `json:"commit_deltas"`
 	CommitPatches bool `json:"commit_patches"`
 }
@@ -80,8 +80,8 @@ func ReadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	if cfg.TmpDirFileSizeLimit < 0.01 {
-		cfg.TmpDirFileSizeLimit = 0.01
+	if cfg.Data.TmpDirFileSizeLimit < 0.01 {
+		cfg.Data.TmpDirFileSizeLimit = 0.01
 	}
 
 	if cfg.Database.CommitsPerTransaction == 0 {

@@ -29,7 +29,7 @@ type gitRepo struct {
 }
 
 // New creates a new gitRepo object.
-func newGitRepo(cfg config.Config, repository model.Repository, gitDir string, useTmpDir bool) (*gitRepo, error) {
+func newGitRepo(cfg config.DataConfig, repository model.Repository, gitDir string, useTmpDir bool) (*gitRepo, error) {
 	r, err := g2g.OpenRepository(gitDir)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func newGitRepo(cfg config.Config, repository model.Repository, gitDir string, u
 		tmpDir = gitDir
 	}
 
-	return &gitRepo{Repository: repository, cfg: cfg.Data, r: r, tmpDir: tmpDir}, nil
+	return &gitRepo{Repository: repository, cfg: cfg, r: r, tmpDir: tmpDir}, nil
 }
 
 // FetchCommits fetches all commits from a Git repository and adds them to

@@ -167,7 +167,7 @@ func main() {
 	for w := uint(0); w < *numGoroutines; w++ {
 		wg.Add(1)
 		go func() {
-			repoRoutine(db, *cfg, commitsChan, reposPathChan)
+			repoRoutine(db, cfg.Data, commitsChan, reposPathChan)
 			wg.Done()
 		}()
 	}
@@ -307,7 +307,7 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 		err = commitTx(tx, stmt)
 	}
 }
-func repoRoutine(db *sql.DB, cfg config.Config, commitsChan chan commit, reposPathChan chan string) {
+func repoRoutine(db *sql.DB, cfg config.DataConfig, commitsChan chan commit, reposPathChan chan string) {
 	for path := range reposPathChan {
 		work := func() error {
 			repository, err := repo.New(cfg, path)
@@ -320,7 +320,7 @@ func repoRoutine(db *sql.DB, cfg config.Config, commitsChan chan commit, reposPa
 				return err
 			}
 
-			if cfg.Data.CommitDeltas {
+			if cfg.CommitDeltas {
 				if err = insertRepoData(db, repository); err != nil {
 					return err
 				}

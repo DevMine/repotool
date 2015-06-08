@@ -70,14 +70,14 @@ func main() {
 	}
 
 	cfg := new(config.Config)
-	cfg.TmpDir = *tmpDirflag
-	cfg.TmpDirFileSizeLimit = *fileSizeLimitflag
+	cfg.Data.TmpDir = *tmpDirflag
+	cfg.Data.TmpDirFileSizeLimit = *fileSizeLimitflag
 	cfg.Data.CommitDeltas = *deltasflag
 	cfg.Data.CommitPatches = *patchesflag
 
 	repoPath := flag.Arg(0)
 	var repository repo.Repo
-	repository, err = repo.New(*cfg, repoPath)
+	repository, err = repo.New(cfg.Data, repoPath)
 	if err != nil {
 		fatal(err)
 	}

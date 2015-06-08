@@ -9,9 +9,9 @@
         "commits_per_transaction": 1000000
     },
     "data": {
+        "tmp_dir": "/ramdisk",
+        "tmp_dir_file_size_limit": 2.0,
         "commit_deltas": false,
         "commit_patches": false
-    },
-    "tmp_dir": "/ramdisk",
-    "tmp_dir_file_size_limit": 2.0
+    }
 }
