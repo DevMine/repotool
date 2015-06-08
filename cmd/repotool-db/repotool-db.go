@@ -292,6 +292,7 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 		i++
 
 		if i == commitsCount {
+			glog.Info("committing", i, "repository commits...")
 			if err = commitTx(tx, stmt); err != nil {
 				return
 			}
@@ -304,6 +305,7 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 	}
 
 	if i > 0 {
+		glog.Info("committing", i, "repository commits...")
 		err = commitTx(tx, stmt)
 	}
 }
