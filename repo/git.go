@@ -233,6 +233,9 @@ func (gr *gitRepo) addCommit(c *g2g.Commit) bool {
 	commit.InsertionsCount = stats.Insertions()
 	commit.DeletionsCount = stats.Deletions()
 
+	if ok := isCommitValid(commit); !ok {
+		return false
+	}
 	gr.Commits = append(gr.Commits, commit)
 
 	return true

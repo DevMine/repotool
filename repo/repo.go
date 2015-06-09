@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/DevMine/repotool/config"
 	"github.com/DevMine/repotool/model"
@@ -172,6 +173,49 @@ func detectVCS(path string) (string, error) {
 	}
 
 	return "", errors.New("VCS type not found")
+}
+
+// isCommitValid checks whether a commit is valid, ie strings are full UTF-8, etc.
+// It also checks that all required elements of the structure are set.
+func isCommitValid(c model.Commit) bool {
+	if c.VCSID == "" || c.Message == "" {
+		return false
+	}
+	if !utf8.ValidString(c.VCSID) {
+		return false
+	}
+
+	if !utf8.ValidString(c.Message) {
+		return false
+	}
+
+	if !isDeveloperValid(c.Author) {
+		return false
+	}
+
+	if !isDeveloperValid(c.Committer) {
+		return false
+	}
+
+	return true
+}
+
+// isDeveloperValid checks whether a developer is valid, ie strings are full
+// UTF-8 and not empty.
+func isDeveloperValid(d model.Developer) bool {
+	if d.Name == "" || d.Email == "" {
+		return false
+	}
+
+	if !utf8.ValidString(d.Name) {
+		return false
+	}
+
+	if !utf8.ValidString(d.Email) {
+		return false
+	}
+
+	return true
 }
 
 // extractName extracts to name of a repository given its clone URL.
