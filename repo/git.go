@@ -187,12 +187,12 @@ func (gr *gitRepo) addCommit(c *g2g.Commit) bool {
 		return false
 	}
 
-	nDeltas, err := diff.NumDeltas()
-	if err != nil {
-		return false
-	}
-
 	if gr.cfg.CommitDeltas {
+		nDeltas, err := diff.NumDeltas()
+		if err != nil {
+			return false
+		}
+
 		for d := 0; d < nDeltas; d++ {
 			var cdd model.DiffDelta
 
