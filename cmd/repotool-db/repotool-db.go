@@ -218,7 +218,7 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 	var err error
 	defer func() {
 		if err != nil {
-			glog.Error(err)
+			glog.Fatal(err)
 		}
 	}()
 
@@ -286,7 +286,8 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 			c.InsertionsCount,
 			c.DeletionsCount)
 		if err != nil {
-			continue
+			tx.Rollback()
+			return
 		}
 
 		i++
