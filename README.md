@@ -137,7 +137,7 @@ on your system unless you statically compile `libgit2` into `git2go`.
 If the requirements are met, installing `repotool` is as simple as running this
 command in a terminal (assuming [Go](http://golang.org/) is installed):
 
-    go get github.com/DevMine/repotool
+    go get github.com/DevMine/repotool/cmd/...
 
 Or you can download a binary for your platform from the DevMine project's
 [downloads page](http://devmine.ch/downloads).
