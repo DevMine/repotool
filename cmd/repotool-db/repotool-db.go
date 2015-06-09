@@ -30,7 +30,7 @@ import (
 	"github.com/DevMine/repotool/repo"
 )
 
-const version = "0.1.0"
+const version = "1.0.0"
 
 // database fields per tables
 var (
@@ -58,7 +58,7 @@ var (
 // program flags
 var (
 	configPath    = flag.String("c", "", "configuration file")
-	vflag         = flag.Bool("V", false, "print version.")
+	versionflag   = flag.Bool("version", false, "print version.")
 	cpuprofile    = flag.String("cpuprofile", "", "write cpu profile to file")
 	depthflag     = flag.Uint("d", 0, "depth level where to find repositories")
 	numGoroutines = flag.Uint("g", uint(runtime.NumCPU()), "max number of goroutines to spawn")
@@ -88,7 +88,7 @@ func main() {
 	}
 	flag.Parse()
 
-	if *vflag {
+	if *versionflag {
 		fmt.Printf("%s - %s\n", filepath.Base(os.Args[0]), version)
 		os.Exit(0)
 	}
