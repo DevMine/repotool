@@ -27,11 +27,11 @@ import (
 	"github.com/DevMine/repotool/repo"
 )
 
-const version = "0.1.0"
+const version = "1.0.0"
 
 // program flags
 var (
-	vflag             = flag.Bool("v", false, "print version.")
+	versionflag       = flag.Bool("version", false, "print version.")
 	srctoolflag       = flag.String("srctool", "", "read json file produced by srctool (give stdin to read from stdin)")
 	cpuprofileflag    = flag.String("cpuprofile", "", "write cpu profile to file")
 	tmpDirflag        = flag.String("tmpdir", "", "temporary directory location")
@@ -50,7 +50,7 @@ func main() {
 	}
 	flag.Parse()
 
-	if *vflag {
+	if *versionflag {
 		fmt.Printf("%s - %s\n", filepath.Base(os.Args[0]), version)
 		os.Exit(0)
 	}
