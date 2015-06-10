@@ -199,7 +199,7 @@ func iterateRepos(reposPathChan chan string, path string, depth uint) {
 			}
 
 			repoPath := filepath.Join(path, fi.Name())
-			glog.Info("adding repository:", repoPath, "to the pool")
+			glog.Info("adding repository: ", repoPath, " to the pool")
 			reposPathChan <- repoPath
 		}
 		return
@@ -293,7 +293,7 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 		i++
 
 		if i == commitsCount {
-			glog.Info("committing", i, "repository commits...")
+			glog.Info("committing ", i, " repository commits...")
 			if err = commitTx(tx, stmt); err != nil {
 				return
 			}
@@ -306,7 +306,7 @@ func dbCopyRoutine(db *sql.DB, commitsChan chan commit) {
 	}
 
 	if i > 0 {
-		glog.Info("committing", i, "repository commits...")
+		glog.Info("committing ", i, " repository commits...")
 		err = commitTx(tx, stmt)
 	}
 }
