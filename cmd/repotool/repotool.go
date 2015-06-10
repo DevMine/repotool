@@ -123,20 +123,16 @@ func main() {
 			return
 		}
 
-		bs := buf.Bytes()
 		var p *src.Project
-		p, err = src.Unmarshal(bs)
+		p, err = src.Decode(buf)
 		if err != nil {
 			return
 		}
 
 		p.Repo = repository.GetRepository()
-		bs, err = src.Marshal(p)
-		if err != nil {
+		if err := p.Encode(os.Stdout); err != nil {
 			return
 		}
-
-		fmt.Println(string(bs))
 	}
 }
 
